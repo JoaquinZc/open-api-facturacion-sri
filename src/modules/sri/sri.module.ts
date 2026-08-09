@@ -22,12 +22,17 @@ import {
 import { SriRepositoryService } from './services/sri-repository.service';
 import { XmlStorageService } from './services/xml-storage.service';
 import { EmisoresModule } from '../emisores/emisores.module';
+import { PdfModule } from '../pdf/pdf.module';
+import { TemplateModule } from '../template/template.module';
 import { SriEmisionProcessor } from './processors/sri-emision.processor';
+import { RideService } from './services/ride.service';
 
 @Module({
   imports: [
     ConfigModule,
     EmisoresModule,
+    PdfModule,
+    TemplateModule,
     BullModule.registerQueue({ name: 'sri-emision' }),
   ],
   controllers: [SriController, CatalogosController],
@@ -49,6 +54,7 @@ import { SriEmisionProcessor } from './processors/sri-emision.processor';
     IdentificacionValidatorService,
     CatalogoValidatorService,
     SriEmisionProcessor,
+    RideService,
   ],
   exports: [
     SriService,
@@ -65,6 +71,7 @@ import { SriEmisionProcessor } from './processors/sri-emision.processor';
     XmlSignerService,
     SriSoapFactoryService,
     CatalogoValidatorService,
+    RideService,
   ],
 })
 export class SriModule {}

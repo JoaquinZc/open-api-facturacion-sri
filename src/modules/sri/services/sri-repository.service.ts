@@ -552,6 +552,7 @@ export class SriRepositoryService {
         c.fecha_autorizacion,
         c.numero_autorizacion as num_autorizacion,
         c.total_sin_impuestos as subtotal,
+        COALESCE((SELECT SUM(valor) FROM comprobante_totales ct WHERE ct.comprobante_id = c.id), 0) as total_impuestos,
         c.importe_total as total,
         c.receptor_identificacion as identificacion_comprador,
         c.receptor_razon_social as razon_social_comprador,
@@ -585,12 +586,27 @@ export class SriRepositoryService {
         c.*,
         e.ruc as ruc_emisor,
         e.razon_social as razon_social_emisor,
+        e.nombre_comercial as nombre_comercial,
+        e.direccion_matriz as direccion_matriz,
+        e.obligado_contabilidad as obligado_contabilidad,
+        e.contribuyente_especial as contribuyente_especial,
+        e.agente_retencion as agente_retencion,
+        e.contribuyente_rimpe as contribuyente_rimpe,
         est.codigo as establecimiento,
+        est.direccion as direccion_establecimiento,
         pe.codigo as punto_emision,
         c.total_sin_impuestos as subtotal,
+        c.total_descuento as total_descuento,
+        COALESCE((SELECT SUM(valor) FROM comprobante_totales ct WHERE ct.comprobante_id = c.id), 0) as total_impuestos,
         c.importe_total as total,
+        c.propina as propina,
+        c.moneda as moneda,
+        c.receptor_tipo_identificacion as receptor_tipo_identificacion,
         c.receptor_identificacion as identificacion_comprador,
         c.receptor_razon_social as razon_social_comprador,
+        c.receptor_direccion as receptor_direccion,
+        c.receptor_email as receptor_email,
+        c.receptor_telefono as receptor_telefono,
         c.numero_autorizacion as num_autorizacion,
         CASE 
           WHEN x.id IS NOT NULL THEN true 
@@ -604,6 +620,63 @@ export class SriRepositoryService {
       WHERE c.clave_acceso = $1`,
       [claveAcceso],
     );
+  }
+
+  /**
+   * Obtiene los totales (impuestos agrupados) de un comprobante
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async findTotalesByComprobanteId(comprobanteId: string): Promise<any[]> {
+    const result = await this.db.query<any>(
+      `SELECT
+        codigo,
+        codigo_porcentaje,
+        base_imponible,
+        tarifa,
+        valor
+      FROM comprobante_totales
+      WHERE comprobante_id = $1
+      ORDER BY codigo, codigo_porcentaje`,
+      [comprobanteId],
+    );
+    return result.rows;
+  }
+
+  /**
+   * Obtiene los impuestos de los detalles de un comprobante
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async findImpuestosByComprobanteId(comprobanteId: string): Promise<any[]> {
+    const result = await this.db.query<any>(
+      `SELECT
+        ci.comprobante_detalle_id,
+        ci.codigo,
+        ci.codigo_porcentaje,
+        ci.tarifa,
+        ci.base_imponible,
+        ci.valor
+      FROM comprobante_impuestos ci
+      INNER JOIN comprobante_detalles cd ON ci.comprobante_detalle_id = cd.id
+      WHERE cd.comprobante_id = $1
+      ORDER BY cd.id, ci.codigo`,
+      [comprobanteId],
+    );
+    return result.rows;
+  }
+
+  /**
+   * Obtiene los pagos de un comprobante
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async findPagosByComprobanteId(comprobanteId: string): Promise<any[]> {
+    const result = await this.db.query<any>(
+      `SELECT forma_pago, total, plazo, unidad_tiempo
+       FROM comprobante_pagos
+       WHERE comprobante_id = $1
+       ORDER BY id`,
+      [comprobanteId],
+    );
+    return result.rows;
   }
 
   /**

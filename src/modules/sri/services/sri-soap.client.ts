@@ -136,6 +136,11 @@ export class SriSoapClient {
 
     if (!recepcion || recepcion.estado === 'DEVUELTA') {
       const mensajes = recepcion ? this.extractMensajes(recepcion) : [];
+      if (mensajes.length > 0) {
+        this.logger.warn(
+          `Comprobante DEVUELTA: ...${claveAcceso.slice(-8)} — Mensajes SRI: ${JSON.stringify(mensajes)}`,
+        );
+      }
       return {
         success: false,
         claveAcceso,
@@ -177,14 +182,15 @@ export class SriSoapClient {
         }
 
         if (auth.estado === 'NO AUTORIZADO') {
+          const mensajesNoAuth = this.extractMensajesAutorizacion(auth);
           this.logger.warn(
-            `Comprobante NO AUTORIZADO: ...${claveAcceso.slice(-8)}`,
+            `Comprobante NO AUTORIZADO: ...${claveAcceso.slice(-8)} — Mensajes SRI: ${JSON.stringify(mensajesNoAuth)}`,
           );
           return {
             success: false,
             claveAcceso,
             estado: 'NO AUTORIZADO',
-            mensajes: this.extractMensajesAutorizacion(auth),
+            mensajes: mensajesNoAuth,
           };
         }
       }

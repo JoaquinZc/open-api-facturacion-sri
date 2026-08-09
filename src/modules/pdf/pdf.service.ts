@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import FormData from 'form-data';
 import { createReadStream } from 'fs';
-import { basename } from 'path';
+import { basename, extname } from 'path';
 import { PdfImageService } from './pdf-image.service';
 
 export interface ImageData {
@@ -49,10 +49,18 @@ export class PdfService {
     // 1. Upload template to Carbone
     const formData = new FormData();
     const templateStream = createReadStream(templatePath);
+    const ext = extname(templatePath).toLowerCase();
+    const contentTypes: Record<string, string> = {
+      '.docx':
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.odt': 'application/vnd.oasis.opendocument.text',
+      '.html': 'text/html',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+    };
     formData.append('template', templateStream, {
       filename: basename(templatePath),
-      contentType:
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      contentType: contentTypes[ext] || 'application/octet-stream',
     });
 
     const templateResponse = await axios.post(

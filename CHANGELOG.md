@@ -6,6 +6,50 @@ Este formato sigue el estándar [Keep a Changelog](https://keepachangelog.com/es
 
 ---
 
+## [1.1.0] — 2026-08-09 · Portal Web Angular + Mejoras de Backend
+
+> **Propósito:** Evolución del proyecto hacia una plataforma completa con portal web SPA para gestión visual de todos los módulos, mejoras de estabilidad y experiencia de usuario.
+
+### Añadido
+
+- **Portal Web Angular 22 (SPA):** aplicación frontend completa con TailwindCSS y PrimeNG, servida independientemente con hot-reload via Vite.
+  - **Dashboard** con métricas resumidas y navegación principal.
+  - **Módulo Comprobantes:** lista paginada con filtros reactivos (RUC emisor, receptor, tipo, estado, fechas, establecimiento, punto emisión), vista de detalle con información general, totales, detalles itemizados, información adicional, descarga de RIDE/XML, verificación SRI, reintentar y anular.
+  - **Módulo Emitir:** formularios completos para los 5 tipos de comprobante (Factura, Nota de Crédito, Nota de Débito, Retención, Guía de Remisión) con validación reactiva, preview XML, cálculo automático de totales y emisión síncrona.
+  - **Módulo Emisores:** CRUD completo con gestión de certificados digitales y información tributaria.
+  - **Módulo Puntos de Emisión:** CRUD con rutas anidadas RESTful (`/emisores/:emisorId/puntos-emision`), vista de secuenciales por tipo de comprobante con cards de colores, auto-redirect al primer emisor.
+  - **Módulo Certificados:** carga, validación y gestión de certificados P12 con extracción de metadata.
+  - **Módulo Catálogos:** visualización de catálogos SRI (impuestos, retenciones, formas de pago).
+  - **Módulo Webhooks:** CRUD de webhooks con regeneración de secreto y visualización de logs.
+  - **Módulo Tenants:** gestión de inquilinos (solo SUPERADMIN) con planes y estados.
+  - **Módulo RIDE/Documentos:** visualización y descarga de representaciones impresas.
+  - **Módulo Perfil:** información de usuario con cambio de contraseña y medidor de fortaleza.
+- **Notificaciones en tiempo real (SSE):** actualización reactiva del listado de comprobantes ante eventos del SRI via Server-Sent Events.
+- **Soporte IVA 15%:** actualización de catálogos según Circular SRI N° NAC-DGERCGC25-00000001.
+- **Paginación keyset con cursor:** implementación de paginación eficiente basada en cursor para el listado de comprobantes.
+- **Endpoint `/auth/me` enriquecido:** retorna datos frescos desde BD incluyendo `tenantNombre` y estado `activo`.
+- **Debounce por campo en filtros:** gestión independiente de timers de debounce para múltiples campos de texto en el listado de comprobantes.
+
+### Corregido
+
+- **Error NG0600 (Angular):** eliminado anti-patrón de escritura de signals dentro de `computed` en `ComprobanteService.meta`; el computed ahora lee directamente del resource reactivo.
+- **Doble fetch en `loadDetalle`:** optimizado para evitar petición redundante cuando la clave de acceso no cambia.
+- **Debounce de filtros de texto:** cada input ahora tiene su propio timer independiente, evitando pérdida de cambios cuando se modifican múltiples campos rápidamente.
+- **Botón "Buscar" del listado:** ahora limpia todos los timers de debounce activos antes de ejecutar la búsqueda.
+- **Extracción de mensajes de error:** unificación del patrón `err.error?.error ?? err.error?.message` en servicios frontend para manejo consistente de errores del backend.
+- **Validación de formularios:** añadido atributo `novalidate` y clase `form-submitted` para validación visual consistente en todos los formularios de emisión.
+- **Cálculo de `total_impuestos`:** corregido subquery en repositorio para obtener impuestos desde `comprobante_totales` en lugar de columna inexistente en tabla `comprobantes`.
+- **Perfil de usuario:** endpoint `/auth/me` ahora consulta BD en lugar de retornar datos stale del JWT.
+
+### Cambiado
+
+- **Estructura de rutas de Puntos de Emisión:** migrado de query params a rutas anidadas RESTful con `paramsInheritanceStrategy: 'always'` para herencia de parámetros en child routes.
+- **UI de Puntos de Emisión:** tabla responsive con scroll horizontal en móvil, cards de secuenciales con colores por tipo de comprobante en vista detalle.
+- **UI de Comprobantes:** badges de estado con colores semánticos (success, warn, danger, info) via componente `StatusBadgeComponent`.
+- **Configuración de Angular:** `withRouterConfig({ paramsInheritanceStrategy: 'always' })` para soporte de rutas anidadas.
+
+---
+
 ## [Sin publicar]
 
 > Los siguientes cambios están planificados y propuestos para las próximas versiones del proyecto.
@@ -37,7 +81,7 @@ Este formato sigue el estándar [Keep a Changelog](https://keepachangelog.com/es
 
 ---
 
-## [1.5.0] — Propuesta · Mejoras de Resiliencia y Observabilidad
+## [1.6.0] — Propuesta · Mejoras de Resiliencia y Observabilidad
 
 > **Propósito:** Hacer el sistema más robusto, observable y fácil de operar en producción.
 
@@ -61,7 +105,7 @@ Este formato sigue el estándar [Keep a Changelog](https://keepachangelog.com/es
 
 ---
 
-## [1.4.0] — Propuesta · Facturación Masiva y Async Avanzado
+## [1.5.0] — Propuesta · Facturación Masiva y Async Avanzado
 
 > **Propósito:** Soportar volúmenes altos de emisión mediante procesamiento por lotes.
 
@@ -78,7 +122,7 @@ Este formato sigue el estándar [Keep a Changelog](https://keepachangelog.com/es
 
 ---
 
-## [1.3.0] — Propuesta · Soporte para Liquidaciones de Compra y Notas de Débito SRI
+## [1.4.0] — Propuesta · Soporte para Liquidaciones de Compra y Notas de Débito SRI
 
 > **Propósito:** Completar la cobertura de tipos de comprobante soportados por el SRI.
 
@@ -90,7 +134,7 @@ Este formato sigue el estándar [Keep a Changelog](https://keepachangelog.com/es
 
 ---
 
-## [1.2.0] — Propuesta · Mejoras de Seguridad y Compliance
+## [1.3.0] — Propuesta · Mejoras de Seguridad y Compliance
 
 > **Propósito:** Robustecer la seguridad del sistema para cumplir estándares empresariales.
 
@@ -108,7 +152,7 @@ Este formato sigue el estándar [Keep a Changelog](https://keepachangelog.com/es
 
 ---
 
-## [1.1.0] — Propuesta · Mejoras de Documentación y DX (Developer Experience)
+## [1.2.0] — Propuesta · Mejoras de Documentación y DX (Developer Experience)
 
 > **Propósito:** Facilitar la adopción del proyecto por desarrolladores externos.
 

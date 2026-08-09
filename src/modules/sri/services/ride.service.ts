@@ -1,0 +1,295 @@
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PdfService } from '../../pdf/pdf.service';
+import { TemplateService } from '../../template/template.service';
+import { SriRepositoryService } from './sri-repository.service';
+import { TIPO_COMPROBANTE_DESCRIPCIONES } from '../constants';
+import { Ambiente, TipoEmision, TipoIdentificacion } from '../constants/sri.enums';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRecord = Record<string, any>;
+
+@Injectable()
+export class RideService {
+  private readonly logger = new Logger(RideService.name);
+  private static readonly RIDE_TEMPLATE_ID = 'ride';
+
+  constructor(
+    private readonly pdfService: PdfService,
+    private readonly templateService: TemplateService,
+    private readonly repository: SriRepositoryService,
+  ) {}
+
+  /**
+   * Genera el RIDE (PDF) de un comprobante por su clave de acceso
+   */
+  async generarRide(claveAcceso: string): Promise<Buffer> {
+    this.logger.log(`Generando RIDE para clave: ${claveAcceso}`);
+
+    const comprobante =
+      await this.repository.findComprobanteConDetalles(claveAcceso);
+    if (!comprobante) {
+      throw new NotFoundException(
+        `Comprobante ${claveAcceso} no encontrado`,
+      );
+    }
+
+    const detalles =
+      await this.repository.findDetallesByComprobanteId(comprobante.id);
+    const totales =
+      await this.repository.findTotalesByComprobanteId(comprobante.id);
+    const impuestos =
+      await this.repository.findImpuestosByComprobanteId(comprobante.id);
+    const pagos =
+      await this.repository.findPagosByComprobanteId(comprobante.id);
+    const infoAdicional =
+      await this.repository.findInfoAdicionalByComprobanteId(comprobante.id);
+
+    const rideData = this.mapComprobanteToRideData(
+      comprobante,
+      detalles,
+      totales,
+      impuestos,
+      pagos,
+      infoAdicional,
+    );
+
+    const templatePath = this.templateService.findTemplate(
+      RideService.RIDE_TEMPLATE_ID,
+    );
+
+    return this.pdfService.generatePDF(
+      rideData as AnyRecord,
+      templatePath,
+    );
+  }
+
+  /**
+   * Mapea los datos del comprobante al formato requerido por el template RIDE
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private mapComprobanteToRideData(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    comprobante: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    detalles: any[],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    totales: any[],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    impuestos: any[],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pagos: any[],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    infoAdicional: any[],
+  ): AnyRecord {
+    const ambienteDesc =
+      comprobante.ambiente === Ambiente.PRODUCCION
+        ? 'PRODUCCI\u00d3N'
+        : 'PRUEBAS';
+
+    const tipoEmisionDesc =
+      comprobante.tipo_emision === TipoEmision.CONTINGENCIA
+        ? 'CONTINGENCIA'
+        : 'NORMAL';
+
+    const tipoCompDesc =
+      TIPO_COMPROBANTE_DESCRIPCIONES[comprobante.tipo_comprobante] ||
+      comprobante.tipo_comprobante;
+
+    const subtotal = parseFloat(comprobante.subtotal) || 0;
+    const totalDescuento = parseFloat(comprobante.total_descuento) || 0;
+    const totalImpuestos = parseFloat(comprobante.total_impuestos) || 0;
+    const total = parseFloat(comprobante.total) || 0;
+    const propina = parseFloat(comprobante.propina) || 0;
+    const moneda = comprobante.moneda === 'DOLAR' ? 'USD' : (comprobante.moneda || 'USD');
+
+    // Group impuestos by detalle_id for embedding in detalles
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const impuestosByDetalle: Record<string, any[]> = {};
+    for (const imp of impuestos) {
+      const key = imp.comprobante_detalle_id;
+      if (!impuestosByDetalle[key]) impuestosByDetalle[key] = [];
+      impuestosByDetalle[key].push({
+        codigo: imp.codigo || '',
+        codigoPorcentaje: imp.codigo_porcentaje || '',
+        tarifa: parseFloat(imp.tarifa) || 0,
+        baseImponibleFormato: this.formatMoneda(parseFloat(imp.base_imponible) || 0, moneda),
+        valorFormato: this.formatMoneda(parseFloat(imp.valor) || 0, moneda),
+      });
+    }
+
+    return {
+      // Emisor
+      rucEmisor: comprobante.ruc_emisor || '',
+      razonSocialEmisor: comprobante.razon_social_emisor || '',
+      nombreComercial: comprobante.nombre_comercial || '',
+      direccionMatriz: comprobante.direccion_matriz || '',
+      direccionEstablecimiento: comprobante.direccion_establecimiento || comprobante.direccion_matriz || '',
+      obligadoContabilidad: comprobante.obligado_contabilidad === true || comprobante.obligado_contabilidad === 'true' ? 'SI' : 'NO',
+      contribuyenteEspecial: comprobante.contribuyente_especial || '',
+      agenteRetencion: comprobante.agente_retencion === true || comprobante.agente_retencion === 'true' ? 'SI' : '',
+      contribuyenteRimpe: comprobante.contribuyente_rimpe === true || comprobante.contribuyente_rimpe === 'true' ? 'SI' : '',
+
+      // Comprobante
+      tipoComprobanteDescripcion: tipoCompDesc,
+      ambienteDescripcion: ambienteDesc,
+      tipoEmisionDescripcion: tipoEmisionDesc,
+      establecimiento: comprobante.establecimiento || '',
+      puntoEmision: comprobante.punto_emision || '',
+      secuencial: comprobante.secuencial || '',
+      numeroComprobante: `${comprobante.establecimiento || ''}-${comprobante.punto_emision || ''}-${comprobante.secuencial || ''}`,
+      fechaEmisionFormato: this.formatFecha(comprobante.fecha_emision),
+      claveAcceso: comprobante.clave_acceso || '',
+      estado: comprobante.estado || '',
+      numAutorizacion: comprobante.num_autorizacion || '',
+      fechaAutorizacionFormato: this.formatFecha(
+        comprobante.fecha_autorizacion,
+      ),
+
+      // Comprador
+      razonSocialComprador: comprobante.razon_social_comprador || '',
+      identificacionComprador: comprobante.identificacion_comprador || '',
+      tipoIdentificacionComprador: this.getTipoIdentificacionDesc(comprobante.receptor_tipo_identificacion),
+      receptorDireccion: comprobante.receptor_direccion || '',
+      receptorEmail: comprobante.receptor_email || '',
+      receptorTelefono: comprobante.receptor_telefono || '',
+
+      // Totales
+      subtotalFormato: this.formatMoneda(subtotal, moneda),
+      totalDescuentoFormato: this.formatMoneda(totalDescuento, moneda),
+      totalImpuestosFormato: this.formatMoneda(totalImpuestos, moneda),
+      propinaFormato: this.formatMoneda(propina, moneda),
+      totalFormato: this.formatMoneda(total, moneda),
+      moneda,
+
+      // Detalles (items) con impuestos embebidos
+      detalles: detalles.map((d) => ({
+        codigoPrincipal: d.codigo_principal || '',
+        codigoAuxiliar: d.codigo_auxiliar || '',
+        descripcion: d.descripcion || '',
+        cantidadFormato: this.formatNumero(parseFloat(d.cantidad) || 0),
+        precioUnitarioFormato: this.formatMoneda(
+          parseFloat(d.precio_unitario) || 0,
+          moneda,
+        ),
+        descuentoFormato: this.formatMoneda(
+          parseFloat(d.descuento) || 0,
+          moneda,
+        ),
+        subtotalFormato: this.formatMoneda(
+          parseFloat(d.precio_total_sin_impuesto) || 0,
+          moneda,
+        ),
+        impuestos: impuestosByDetalle[d.id] || [],
+      })),
+
+      // Totales agrupados (impuestos)
+      totales: totales.map((t) => ({
+        codigo: t.codigo || '',
+        descripcion: this.getImpuestoDescripcion(t.codigo),
+        codigoPorcentaje: t.codigo_porcentaje || '',
+        tarifa: parseFloat(t.tarifa) || 0,
+        baseImponibleFormato: this.formatMoneda(
+          parseFloat(t.base_imponible) || 0,
+          moneda,
+        ),
+        valorFormato: this.formatMoneda(parseFloat(t.valor) || 0, moneda),
+      })),
+
+      // Pagos
+      pagos: pagos.map((p) => ({
+        formaPago: p.forma_pago || '',
+        formaPagoDescripcion: this.getFormaPagoDescripcion(p.forma_pago),
+        totalFormato: this.formatMoneda(parseFloat(p.total) || 0, moneda),
+        plazo: p.plazo ? String(p.plazo) : '',
+        unidadTiempo: p.unidad_tiempo || '',
+      })),
+
+      // Info adicional
+      infoAdicional: (infoAdicional || []).map((ia) => ({
+        nombre: ia.nombre || '',
+        valor: ia.valor || '',
+      })),
+    };
+  }
+
+  /**
+   * Formatea una fecha al formato DD/MM/YYYY HH:mm:ss
+   */
+  private formatFecha(fecha: string | null | undefined): string {
+    if (!fecha) return '';
+    try {
+      const date = new Date(fecha);
+      if (isNaN(date.getTime())) return fecha;
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yyyy = date.getFullYear();
+      const hh = String(date.getHours()).padStart(2, '0');
+      const min = String(date.getMinutes()).padStart(2, '0');
+      const ss = String(date.getSeconds()).padStart(2, '0');
+      return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
+    } catch {
+      return fecha;
+    }
+  }
+
+  /**
+   * Formatea un valor monetario
+   */
+  private formatMoneda(valor: number, moneda: string = 'USD'): string {
+    const simbolo = moneda === 'USD' ? '$' : '';
+    return `${simbolo}${valor.toFixed(2)}`;
+  }
+
+  /**
+   * Formatea un número (cantidad)
+   */
+  private formatNumero(valor: number): string {
+    return valor.toFixed(2);
+  }
+
+  /**
+   * Descripción del impuesto según código SRI
+   */
+  private getImpuestoDescripcion(codigo: string): string {
+    const descripciones: Record<string, string> = {
+      '2': 'IVA',
+      '3': 'ICE',
+      '5': 'IRB',
+    };
+    return descripciones[codigo] || 'IMP';
+  }
+
+  /**
+   * Descripción del tipo de identificación según código SRI
+   */
+  private getTipoIdentificacionDesc(codigo: string | null | undefined): string {
+    if (!codigo) return '';
+    const descripciones: Record<string, string> = {
+      [TipoIdentificacion.RUC]: 'RUC',
+      [TipoIdentificacion.CEDULA]: 'CÉDULA',
+      [TipoIdentificacion.PASAPORTE]: 'PASAPORTE',
+      [TipoIdentificacion.CONSUMIDOR_FINAL]: 'CONSUMIDOR FINAL',
+      [TipoIdentificacion.IDENTIFICACION_EXTERIOR]: 'IDENTIFICACIÓN EXTERIOR',
+      [TipoIdentificacion.PLACA]: 'PLACA',
+    };
+    return descripciones[codigo] || codigo;
+  }
+
+  /**
+   * Descripción de la forma de pago según código SRI
+   */
+  private getFormaPagoDescripcion(codigo: string | null | undefined): string {
+    if (!codigo) return '';
+    const descripciones: Record<string, string> = {
+      '01': 'SIN UTILIZACIÓN DEL SISTEMA FINANCIERO',
+      '15': 'COMPENSACIÓN DE DEUDAS',
+      '16': 'TARJETA DE DÉBITO',
+      '17': 'DINERO ELECTRÓNICO',
+      '18': 'TARJETA PREPAGO',
+      '19': 'TARJETA DE CRÉDITO',
+      '20': 'OTROS CON UTILIZACIÓN DEL SISTEMA FINANCIERO',
+      '21': 'ENDOSO DE TÍTULOS',
+    };
+    return descripciones[codigo] || codigo;
+  }
+}

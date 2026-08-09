@@ -145,6 +145,12 @@ export class RetencionService {
         claveAcceso,
       );
 
+      if (!resultado.success && resultado.mensajes?.length) {
+        this.logger.warn(
+          `RET ...${claveAcceso.slice(-8)} — ${resultado.estado} — Mensajes: ${JSON.stringify(resultado.mensajes)}`,
+        );
+      }
+
       // Persistir en base de datos
       if (emisor && puntoEmisionInfo) {
         await this.persistirRetencion(
@@ -162,6 +168,27 @@ export class RetencionService {
         );
       } else {
         this.logger.warn('Emisor no encontrado en BD, retención no persistida');
+      }
+
+      // Emit events for webhooks
+      if (resultado.success) {
+        this.eventEmitter.emit('comprobante.autorizado', {
+          claveAcceso,
+          emisorRuc: dto.emisor.ruc,
+          tipoComprobante: TipoComprobante.COMPROBANTE_RETENCION,
+          numeroAutorizacion: resultado.numeroAutorizacion,
+          fechaAutorizacion: resultado.fechaAutorizacion,
+          timestamp: new Date(),
+        });
+      } else {
+        this.eventEmitter.emit('comprobante.rechazado', {
+          claveAcceso,
+          emisorRuc: dto.emisor.ruc,
+          tipoComprobante: TipoComprobante.COMPROBANTE_RETENCION,
+          estado: resultado.estado,
+          mensajes: resultado.mensajes,
+          timestamp: new Date(),
+        });
       }
 
       return this.mapResultToRetencionResponse(resultado);
@@ -221,8 +248,10 @@ export class RetencionService {
           for (const imp of retencion.impuestos) {
             await client.query(
               `INSERT INTO comprobante_retenciones 
-               (comprobante_id, codigo, codigo_retencion, base_imponible, porcentaje_retener, valor_retenido, cod_doc_sustento, num_doc_sustento, fecha_emision_doc_sustento)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+               (comprobante_id, codigo, codigo_retencion, base_imponible, porcentaje_retener, valor_retenido, 
+                cod_doc_sustento, num_doc_sustento, fecha_emision_doc_sustento, 
+                total_sin_impuestos, importe_total, pago_loc_ext)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
               [
                 comprobante.id,
                 imp.codigo,
@@ -233,6 +262,9 @@ export class RetencionService {
                 imp.codDocSustento,
                 imp.numDocSustento,
                 imp.fechaEmisionDocSustento?.split('/').reverse().join('-'),
+                imp.totalSinImpuestos,
+                imp.importeTotal,
+                imp.pagoLocExt,
               ],
             );
           }
@@ -261,14 +293,37 @@ export class RetencionService {
           client,
         );
 
-        // 4. Create info adicional
+        // 4. Create info adicional (from DTO + SRI messages if rejected)
+        const infoAdicionalRecords: { comprobante_id: string; nombre: string; valor: string }[] = [];
+
         if (dto.infoAdicional && dto.infoAdicional.length > 0) {
-          await this.repository.createInfoAdicional(
-            dto.infoAdicional.map((info) => ({
+          infoAdicionalRecords.push(
+            ...dto.infoAdicional.map((info) => ({
               comprobante_id: comprobante.id!,
               nombre: info.nombre,
               valor: info.valor,
             })),
+          );
+        }
+
+        // Persist SRI error messages when rejected
+        if (
+          !resultado.success &&
+          resultado.mensajes &&
+          resultado.mensajes.length > 0
+        ) {
+          for (const msg of resultado.mensajes) {
+            infoAdicionalRecords.push({
+              comprobante_id: comprobante.id!,
+              nombre: `SRI_${msg.identificador || 'ERROR'}`,
+              valor: `${msg.tipo || 'ERROR'}: ${msg.mensaje}`,
+            });
+          }
+        }
+
+        if (infoAdicionalRecords.length > 0) {
+          await this.repository.createInfoAdicional(
+            infoAdicionalRecords,
             client,
           );
         }

@@ -18,6 +18,13 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+/bitacoras
+/bitacora-pruebas.md
+/progreso-pruebas.md
+/.playwright-mcp
+/playwright-report
+/test-results
+/playwright/.cache
 
 # IDEs and editors
 /.idea
@@ -62,6 +69,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Agents
 .agents
 .agent
+.devin
 skills-lock.json
 .windsurf
 

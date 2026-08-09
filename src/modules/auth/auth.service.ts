@@ -187,6 +187,33 @@ export class AuthService {
   }
 
   /**
+   * Obtiene el perfil del usuario desde la BD (datos frescos, no del JWT)
+   */
+  async getProfile(userId: string) {
+    const user = await this.db.queryOne<any>(
+      `SELECT u.id, u.email, u.rol, u.tenant_id, u.activo,
+              t.nombre as tenant_nombre
+       FROM usuarios u
+       LEFT JOIN tenants t ON t.id = u.tenant_id
+       WHERE u.id = $1`,
+      [userId],
+    );
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      rol: user.rol,
+      tenantId: user.tenant_id,
+      tenantNombre: user.tenant_nombre ?? null,
+      activo: user.activo,
+    };
+  }
+
+  /**
    * Cambia la contraseña del usuario actual
    */
   async changePassword(

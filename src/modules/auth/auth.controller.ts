@@ -100,12 +100,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Datos del usuario actual' })
   @ApiResponse({ status: 401, description: 'Token inválido o expirado' })
   getProfile(@CurrentUser() user: JwtPayload) {
-    return {
-      id: user.sub,
-      email: user.email,
-      rol: user.rol,
-      tenantId: user.tenantId,
-    };
+    return this.authService.getProfile(user.sub);
   }
 
   /**

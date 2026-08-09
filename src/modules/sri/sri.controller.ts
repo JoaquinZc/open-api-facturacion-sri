@@ -37,6 +37,7 @@ import { JwtPayload, UserRole } from '../auth/dto/auth.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ConfigService } from '@nestjs/config';
 import { extractRucFromClaveAcceso } from './utils/clave-acceso.utils';
+import { RideService } from './services/ride.service';
 import {
   CreateFacturaDto,
   FacturaResponseDto,
@@ -66,6 +67,7 @@ export class SriController {
     private readonly sriService: SriService,
     private readonly emisoresService: EmisoresService,
     private readonly configService: ConfigService,
+    private readonly rideService: RideService,
   ) {}
 
   /**
@@ -430,6 +432,33 @@ export class SriController {
       `attachment; filename="${claveAcceso}.xml"`,
     );
     res.send(xml);
+  }
+
+  @Get('comprobantes/:claveAcceso/ride')
+  @ApiOperation({
+    summary: 'Descargar RIDE (PDF) del comprobante',
+    description: 'Genera y descarga el RIDE (Representaciin Impresa del Documento Electrnico) en PDF',
+  })
+  @ApiParam({
+    name: 'claveAcceso',
+    description: 'Clave de acceso de 49 digitos',
+  })
+  @ApiResponse({ status: 200, description: 'RIDE en PDF' })
+  @ApiResponse({ status: 404, description: 'Comprobante no encontrado' })
+  async descargarRide(
+    @Param('claveAcceso') claveAcceso: string,
+    @Res() res: Response,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    this.logger.log(`GET /sri/comprobantes/${claveAcceso}/ride`);
+    await this.validateClaveAccesoAccess(claveAcceso, user);
+    const pdfBuffer = await this.rideService.generarRide(claveAcceso);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="RIDE_${claveAcceso}.pdf"`,
+    );
+    res.send(pdfBuffer);
   }
 
   @Patch('comprobantes/:claveAcceso/anular')
