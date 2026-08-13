@@ -4,6 +4,7 @@ import { Queue } from 'bullmq';
 import { extractRucFromClaveAcceso } from './utils/clave-acceso.utils';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { DatabaseService } from '../../database';
 import {
   SriSoapClient,
   FacturaService,
@@ -46,12 +47,26 @@ export class SriService {
     private readonly eventEmitter: EventEmitter2,
     private readonly configService: ConfigService,
     private readonly xmlBuilder: XmlBuilderService,
+    private readonly db: DatabaseService,
     @InjectQueue('sri-emision') private readonly emisionQueue: Queue,
   ) {}
 
   // ==========================================
   // FACTURA — Delegado a FacturaService
   // ==========================================
+
+  /**
+   * Emisión de facturas.
+   *
+   * Desde el 01/01/2026, la transmisión en tiempo real es obligatoria
+   * (Resolución NAC-DGERCGC26-00000027). Por defecto, SRI_EMISION_ASYNC
+   * debe ser 'false' para cumplir con emisión síncrona.
+   *
+   * El modo encolado (SRI_EMISION_ASYNC='true') se mantiene como
+   * contingencia para cuando el SRI está caído. En ese caso, los
+   * comprobantes se encolan y se procesan automáticamente cuando
+   * el SRI vuelve a estar disponible.
+   */
 
   async emitirFactura(dto: CreateFacturaDto): Promise<EmisionEncoladaResponseDto | FacturaResponseDto> {
     const isAsync = this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
@@ -67,7 +82,7 @@ export class SriService {
     };
   }
 
-  generarXmlPreview(dto: CreateFacturaDto): string {
+  async generarXmlPreview(dto: CreateFacturaDto): Promise<string> {
     return this.facturaService.generarXmlPreview(dto);
   }
 
@@ -427,6 +442,10 @@ export class SriService {
   /**
    * Anula un comprobante que NO ha sido autorizado por el SRI
    * Solo permite anular comprobantes con estado diferente a AUTORIZADO
+   *
+   * Validaciones:
+   * - #3: Bloquear anulación de facturas a consumidor final (identificación 9999999999999)
+   * - #4: Validar plazo de anulación en línea (hasta día 7 del mes siguiente a la emisión)
    */
   async anularComprobante(
     claveAcceso: string,
@@ -453,6 +472,40 @@ export class SriService {
       throw new BadRequestException('El comprobante ya está ANULADO');
     }
 
+    // #3: Bloquear anulación de facturas a consumidor final
+    if (
+      comprobante.tipo_comprobante === '01' &&
+      comprobante.receptor_identificacion === '9999999999999'
+    ) {
+      throw new BadRequestException(
+        'No se puede anular una factura emitida a Consumidor Final (identificación 9999999999999). ' +
+          'Las facturas a consumidor final no son anulables en línea.',
+      );
+    }
+
+    // #4: Validar plazo de anulación en línea (hasta día 7 del mes siguiente a la emisión)
+    const fechaEmision = new Date(comprobante.fecha_emision);
+    const ahora = new Date();
+    const primerDiaMesSiguiente = new Date(
+      fechaEmision.getFullYear(),
+      fechaEmision.getMonth() + 1,
+      1,
+    );
+    const dia7MesSiguiente = new Date(
+      fechaEmision.getFullYear(),
+      fechaEmision.getMonth() + 1,
+      7,
+      23, 59, 59, 999,
+    );
+
+    if (ahora > dia7MesSiguiente) {
+      throw new BadRequestException(
+        `El plazo para anular en línea ha expirado. Solo se puede anular hasta el día 7 del mes siguiente a la emisión ` +
+          `(límite: ${dia7MesSiguiente.toLocaleDateString('es-EC')}). ` +
+          `Fecha de emisión del comprobante: ${fechaEmision.toLocaleDateString('es-EC')}.`,
+      );
+    }
+
     // Actualizar estado a ANULADO
     await this.repository.updateComprobante(comprobante.id as string, {
       estado: 'ANULADO',
@@ -462,6 +515,13 @@ export class SriService {
     this.logger.log(
       `Comprobante ${claveAcceso} anulado. Estado anterior: ${estadoActual}`,
     );
+
+    // #6: Emitir evento de anulación para notificación
+    this.eventEmitter.emit('comprobante.anulado', {
+      claveAcceso,
+      tipoComprobante: comprobante.tipo_comprobante,
+      estadoAnterior: estadoActual,
+    });
 
     return {
       message: 'Comprobante anulado exitosamente',
@@ -894,5 +954,274 @@ export class SriService {
       errores,
       detalle,
     };
+  }
+
+  // ==========================================
+  // ANULACIÓN CON ACEPTACIÓN DEL RECEPTOR (#5)
+  // ==========================================
+
+  /**
+   * Crea una solicitud de anulación que requiere aceptación del receptor.
+   * Aplica para retenciones (07), notas de crédito (04) y notas de débito (05).
+   * El receptor tiene 5 días hábiles para responder.
+   */
+  async crearSolicitudAnulacion(
+    claveAcceso: string,
+    motivo?: string,
+  ): Promise<{
+    id: string;
+    claveAcceso: string;
+    estado: string;
+    mensaje: string;
+  }> {
+    const comprobante =
+      await this.repository.findComprobanteByClaveAcceso(claveAcceso);
+
+    if (!comprobante) {
+      throw new BadRequestException(`Comprobante ${claveAcceso} no encontrado`);
+    }
+
+    const tiposRequierenAceptacion = ['04', '05', '07'];
+    if (!tiposRequierenAceptacion.includes(comprobante.tipo_comprobante)) {
+      throw new BadRequestException(
+        'Solo las retenciones, notas de crédito y notas de débito requieren aceptación del receptor para anulación.',
+      );
+    }
+
+    if (comprobante.estado === 'AUTORIZADO') {
+      throw new BadRequestException(
+        'No se puede anular un comprobante AUTORIZADO. Emita una nota de crédito.',
+      );
+    }
+
+    if (comprobante.estado === 'ANULADO') {
+      throw new BadRequestException('El comprobante ya está ANULADO');
+    }
+
+    // Verificar si ya existe una solicitud pendiente
+    const existing = await this.db.query(
+      `SELECT id, estado FROM anulacion_solicitudes WHERE comprobante_clave_acceso = $1 AND estado = 'PENDIENTE'`,
+      [claveAcceso],
+    );
+    if (existing.rows.length > 0) {
+      throw new BadRequestException(
+        `Ya existe una solicitud de anulación pendiente (ID: ${existing.rows[0].id}) para este comprobante.`,
+      );
+    }
+
+    const result = await this.db.query(
+      `INSERT INTO anulacion_solicitudes (comprobante_clave_acceso, tipo_comprobante, emisor_ruc, receptor_identificacion, motivo_solicitud)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, estado`,
+      [
+        claveAcceso,
+        comprobante.tipo_comprobante,
+        extractRucFromClaveAcceso(claveAcceso),
+        comprobante.receptor_identificacion || '',
+        motivo || null,
+      ],
+    );
+
+    const solicitud = result.rows[0];
+    this.logger.log(
+      `Solicitud de anulación creada para ${claveAcceso}. ID: ${solicitud.id}`,
+    );
+
+    return {
+      id: solicitud.id,
+      claveAcceso,
+      estado: solicitud.estado,
+      mensaje: 'Solicitud de anulación creada. El receptor tiene 5 días hábiles para responder.',
+    };
+  }
+
+  /**
+   * El receptor responde a una solicitud de anulación (aceptar o rechazar).
+   */
+  async responderSolicitudAnulacion(
+    solicitudId: string,
+    respuesta: 'ACEPTADA' | 'RECHAZADA',
+    motivoRespuesta?: string,
+  ): Promise<{
+    solicitudId: string;
+    claveAcceso: string;
+    estado: string;
+    mensaje: string;
+  }> {
+    const result = await this.db.query(
+      `SELECT * FROM anulacion_solicitudes WHERE id = $1`,
+      [solicitudId],
+    );
+
+    if (result.rows.length === 0) {
+      throw new BadRequestException(`Solicitud de anulación ${solicitudId} no encontrada`);
+    }
+
+    const solicitud = result.rows[0];
+
+    if (solicitud.estado !== 'PENDIENTE') {
+      throw new BadRequestException(
+        `La solicitud ya fue respondida (estado: ${solicitud.estado})`,
+      );
+    }
+
+    // Verificar plazo de 5 días hábiles
+    const creadoAt = new Date(solicitud.creado_at);
+    const ahora = new Date();
+    const diasHabiles = this.calcularDiasHabiles(creadoAt, ahora);
+    if (diasHabiles > 5) {
+      await this.db.query(
+        `UPDATE anulacion_solicitudes SET estado = 'EXPIRADA', actualizado_at = NOW() WHERE id = $1`,
+        [solicitudId],
+      );
+      throw new BadRequestException(
+        'El plazo de 5 días hábiles para responder ha expirado.',
+      );
+    }
+
+    await this.db.query(
+      `UPDATE anulacion_solicitudes
+       SET estado = $1, respuesta_motivo = $2, respondido_at = NOW(), actualizado_at = NOW()
+       WHERE id = $3`,
+      [respuesta, motivoRespuesta || null, solicitudId],
+    );
+
+    if (respuesta === 'ACEPTADA') {
+      // Anular el comprobante
+      await this.repository.updateComprobanteByClaveAcceso(
+        solicitud.comprobante_clave_acceso,
+        { estado: 'ANULADO', estado_sri: 'ANULADO' },
+      );
+
+      this.eventEmitter.emit('comprobante.anulado', {
+        claveAcceso: solicitud.comprobante_clave_acceso,
+        tipoComprobante: solicitud.tipo_comprobante,
+        estadoAnterior: 'AUTORIZADO',
+      });
+
+      this.logger.log(
+        `Comprobante ${solicitud.comprobante_clave_acceso} anulado por aceptación del receptor.`,
+      );
+    } else {
+      this.logger.log(
+        `Solicitud de anulación ${solicitudId} rechazada por el receptor.`,
+      );
+    }
+
+    return {
+      solicitudId,
+      claveAcceso: solicitud.comprobante_clave_acceso,
+      estado: respuesta,
+      mensaje:
+        respuesta === 'ACEPTADA'
+          ? 'Anulación aceptada. El comprobante ha sido anulado.'
+          : 'Anulación rechazada por el receptor.',
+    };
+  }
+
+  /**
+   * Consulta el estado de una solicitud de anulación.
+   */
+  async consultarSolicitudAnulacion(solicitudId: string): Promise<{
+    id: string;
+    comprobanteClaveAcceso: string;
+    tipoComprobante: string;
+    emisorRuc: string;
+    receptorIdentificacion: string;
+    estado: string;
+    motivoSolicitud?: string;
+    respuestaMotivo?: string;
+    respondidoAt?: string;
+    creadoAt: string;
+  }> {
+    const result = await this.db.query(
+      `SELECT * FROM anulacion_solicitudes WHERE id = $1`,
+      [solicitudId],
+    );
+
+    if (result.rows.length === 0) {
+      throw new BadRequestException(`Solicitud ${solicitudId} no encontrada`);
+    }
+
+    const s = result.rows[0];
+    return {
+      id: s.id,
+      comprobanteClaveAcceso: s.comprobante_clave_acceso,
+      tipoComprobante: s.tipo_comprobante,
+      emisorRuc: s.emisor_ruc,
+      receptorIdentificacion: s.receptor_identificacion,
+      estado: s.estado,
+      motivoSolicitud: s.motivo_solicitud,
+      respuestaMotivo: s.respuesta_motivo,
+      respondidoAt: s.respondido_at,
+      creadoAt: s.creado_at,
+    };
+  }
+
+  /**
+   * Calcula días hábiles entre dos fechas (excluyendo fines de semana).
+   */
+  private calcularDiasHabiles(inicio: Date, fin: Date): number {
+    let count = 0;
+    const cur = new Date(inicio);
+    while (cur < fin) {
+      const day = cur.getDay();
+      if (day !== 0 && day !== 6) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  }
+
+  // ==========================================
+  // ANULACIÓN MASIVA (#8)
+  // ==========================================
+
+  /**
+   * Anula múltiples comprobantes en lote.
+   * Aplica las mismas validaciones que anularComprobante individualmente.
+   */
+  async anularMasivamente(
+    clavesAcceso: string[],
+  ): Promise<{
+    procesados: number;
+    anulados: number;
+    errores: number;
+    detalle: Array<{ claveAcceso: string; estado: string; error?: string }>;
+  }> {
+    const BATCH_SIZE = 100;
+    let procesados = 0;
+    let anulados = 0;
+    let errores = 0;
+    const detalle: Array<{ claveAcceso: string; estado: string; error?: string }> = [];
+
+    for (let i = 0; i < clavesAcceso.length; i += BATCH_SIZE) {
+      const batch = clavesAcceso.slice(i, i + BATCH_SIZE);
+
+      for (const claveAcceso of batch) {
+        try {
+          await this.anularComprobante(claveAcceso);
+          detalle.push({ claveAcceso, estado: 'ANULADO' });
+          anulados++;
+        } catch (error) {
+          detalle.push({
+            claveAcceso,
+            estado: 'ERROR',
+            error: (error as Error).message,
+          });
+          errores++;
+        }
+        procesados++;
+      }
+
+      this.logger.log(
+        `Anulación masiva: ${procesados}/${clavesAcceso.length} procesados`,
+      );
+    }
+
+    this.logger.log(
+      `Anulación masiva completada: ${procesados} procesados, ${anulados} anulados, ${errores} errores`,
+    );
+
+    return { procesados, anulados, errores, detalle };
   }
 }

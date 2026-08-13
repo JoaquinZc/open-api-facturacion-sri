@@ -137,10 +137,10 @@ describe('SriService — Emisión Factura', () => {
   // ==========================================
   // U-SRI-EMI-03: generarXmlPreview delega a FacturaService
   // ==========================================
-  it('U-SRI-EMI-03: generarXmlPreview delega a FacturaService', () => {
-    facturaService.generarXmlPreview.mockReturnValue('<factura>xml</factura>');
+  it('U-SRI-EMI-03: generarXmlPreview delega a FacturaService', async () => {
+    facturaService.generarXmlPreview.mockResolvedValue('<factura>xml</factura>');
 
-    const result = service.generarXmlPreview(createValidDto());
+    const result = await service.generarXmlPreview(createValidDto());
 
     expect(facturaService.generarXmlPreview).toHaveBeenCalled();
     expect(result).toBe('<factura>xml</factura>');
