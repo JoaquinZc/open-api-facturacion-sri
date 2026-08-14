@@ -158,7 +158,7 @@ docker compose up -d --build
 ```bash
 curl -X POST http://localhost:3001/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "superadmin@openapi-sri.com", "password": "Admin123!"}'
+  -d '{"email": "'"$BOOTSTRAP_ADMIN_EMAIL"'", "password": "'"$BOOTSTRAP_ADMIN_PASSWORD"'"}'
 ```
 
 ```json
@@ -469,12 +469,24 @@ El sistema incluye seguridad JWT con tres niveles de acceso:
 
 ### Credenciales iniciales
 
-Al ejecutar `database/init.sql` se crea el superadmin:
+El esquema y el superadmin inicial se crean solos al arrancar el contenedor: el
+entrypoint ejecuta `dist/scripts/db-bootstrap.js`, que aplica `database/init.sql`
+la primera vez y en los arranques siguientes solo verifica y deja pasar.
 
+La credencial del superadmin **no está en el repositorio** — se toma de dos
+variables de entorno que defines en tu plataforma (Railway, `.env`, etc.):
+
+```bash
+BOOTSTRAP_ADMIN_EMAIL="admin@tudominio.com"
+BOOTSTRAP_ADMIN_PASSWORD="una-contraseña-larga"
 ```
-Email:     superadmin@openapi-sri.com
-Password:  Admin123!
-```
+
+Si el usuario ya existe, el bootstrap **no lo toca**, para no pisar en cada
+despliegue una contraseña cambiada con `PATCH /auth/change-password`. Para
+forzar el cambio, arranca una vez con `BOOTSTRAP_ADMIN_RESET_PASSWORD=true` y
+después quita esa variable.
+
+Fuera de Docker puedes correrlo a mano con `npm run build && npm run db:bootstrap`.
 
 > ⚠️ **Cambia la contraseña inmediatamente** en producción usando `PATCH /auth/change-password`.
 

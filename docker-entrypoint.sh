@@ -20,5 +20,11 @@ done
 # Ensure writability even if chown fails (e.g., Windows Docker Desktop bind mounts)
 chmod -R u+rwX,g+rwX,o+rwX /data 2>/dev/null || true
 
+# Inicializa el esquema de la base la primera vez. Es idempotente: si ya se
+# aplicó, solo verifica y sigue. Con `set -e`, si falla el arranque se aborta
+# en vez de levantar la API contra una base vacía.
+echo "==> Verificando esquema de base de datos..."
+su-exec appuser node /app/dist/scripts/db-bootstrap.js
+
 # Drop to appuser and execute the main command
 exec su-exec appuser "$@"

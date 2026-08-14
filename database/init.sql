@@ -1026,7 +1026,9 @@ INSERT INTO public.sistema_config VALUES ('a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 -- Data for Name: usuarios; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-INSERT INTO public.usuarios (id, email, password_hash, rol, tenant_id, activo, created_at, updated_at, last_login) VALUES ('00000000-0000-0000-0000-000000000000', 'superadmin@openapi-sri.com', '$2b$12$85teQgrnCqABaMn.DH0b3O8.M3Zk5RhUuZe3J/rqsgBlDqCSVFRKm', 'SUPERADMIN', NULL, true, now(), now(), NULL) ON CONFLICT DO NOTHING;
+-- El superadmin inicial NO se siembra aquí a propósito: una contraseña en este
+-- archivo termina publicada en el repositorio. Lo crea dist/scripts/db-bootstrap.js
+-- en el arranque, a partir de BOOTSTRAP_ADMIN_EMAIL y BOOTSTRAP_ADMIN_PASSWORD.
 
 
 --
