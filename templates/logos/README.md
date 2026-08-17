@@ -40,3 +40,15 @@ la base de datos. Con unos pocos, esto sobra.
 - **Ancho de 300–600 px.** La plantilla lo limita a 150 pt de ancho y 46 pt de
   alto; más resolución solo engorda el PDF, que viaja en cada descarga.
 - **Apaisado mejor que cuadrado**: el hueco es más ancho que alto.
+
+---
+
+## El logo va en el encabezado del Word
+
+`ride.docx` coloca el logo en el **encabezado** (`header1.xml`), con la etiqueta
+`{d.emisor.logo}` en el texto alternativo de una imagen de relleno. Carbone la
+sustituye conservando el tamaño y la posición que le hayas dado en Word.
+
+Si al desplegar el logo no aparece pero sí el resto, la causa a mirar es esa:
+que Carbone no esté procesando el encabezado. La solución sería mover la imagen
+al cuerpo del documento.

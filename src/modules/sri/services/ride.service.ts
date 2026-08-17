@@ -223,8 +223,143 @@ export class RideService {
       });
     }
 
+    /*
+     * ─── Las casillas de totales del RIDE ────────────────────────────────
+     *
+     * La plantilla las pide por nombre —`subtotal15`, `iva5`, `ice`— y no como
+     * una lista, porque **así es el formulario**: un RIDE tiene una casilla fija
+     * por tarifa, y las que no aplican se imprimen en cero. Recorrerlas como
+     * array obligaba a la plantilla a repetir filas y solo salía la tarifa que
+     * la factura usaba, dejando el bloque incompleto.
+     *
+     * El agrupador es `codigo_porcentaje` del catálogo del SRI:
+     *   0 → 0 %   ·   4 → 15 %   ·   5 → 5 %   ·   6 → no objeto   ·   7 → exento
+     * El ICE es otro impuesto entero (`codigo` 3), no una tarifa del IVA.
+     */
+    const baseDe = (cp: string): number =>
+      totales
+        .filter((t) => String(t.codigo) === '2' && String(t.codigo_porcentaje) === cp)
+        .reduce((s, t) => s + (parseFloat(t.base_imponible) || 0), 0);
+
+    const ivaDe = (cp: string): number =>
+      totales
+        .filter((t) => String(t.codigo) === '2' && String(t.codigo_porcentaje) === cp)
+        .reduce((s, t) => s + (parseFloat(t.valor) || 0), 0);
+
+    const totalIce = totales
+      .filter((t) => String(t.codigo) === '3')
+      .reduce((s, t) => s + (parseFloat(t.valor) || 0), 0);
+
+    const m = (v: number): string => this.formatMoneda(v, moneda);
+
     return {
-      // Emisor
+      /*
+       * ═══ Forma anidada — la que consume `ride.docx` ════════════════════
+       *
+       * Se separa en `emisor` / `factura` / `cliente` / `totales` porque es
+       * como está organizado el documento en papel, y así quien edita la
+       * plantilla en Word encuentra el dato donde lo busca.
+       *
+       * Las claves planas de más abajo se mantienen: son las que usaba la
+       * plantilla HTML anterior y no cuesta nada dejarlas por si hiciera falta
+       * volver.
+       */
+      emisor: {
+        razonSocial: comprobante.razon_social_emisor || '',
+        nombreComercial: comprobante.nombre_comercial || '',
+        ruc: comprobante.ruc_emisor || '',
+        direccionMatriz: comprobante.direccion_matriz || '',
+        direccionSucursal:
+          comprobante.direccion_establecimiento ||
+          comprobante.direccion_matriz ||
+          '',
+        contribuyenteEspecial: comprobante.contribuyente_especial || '',
+        obligadoContabilidad:
+          comprobante.obligado_contabilidad === true ||
+          comprobante.obligado_contabilidad === 'true'
+            ? 'SI'
+            : 'NO',
+        regimenRimpe:
+          comprobante.contribuyente_rimpe === true ||
+          comprobante.contribuyente_rimpe === 'true'
+            ? 'CONTRIBUYENTE RÉGIMEN RIMPE'
+            : '',
+        agenteRetencion:
+          comprobante.agente_retencion === true ||
+          comprobante.agente_retencion === 'true'
+            ? 'AGENTE DE RETENCIÓN'
+            : '',
+        logo: extras.logoDataUri,
+        /*
+         * Estos cinco no existen en el comprobante: son datos de marca, no
+         * fiscales, y el SRI no los guarda. Se emiten vacíos para que la
+         * plantilla no imprima la etiqueta cruda. Si algún día hacen falta,
+         * el sitio es la ficha del emisor.
+         */
+        eslogan: '',
+        ciudad: '',
+        email: '',
+        web: '',
+        telefono: '',
+      },
+
+      factura: {
+        estab: comprobante.establecimiento || '',
+        ptoEmi: comprobante.punto_emision || '',
+        secuencial: comprobante.secuencial || '',
+        numeroAutorizacion: comprobante.num_autorizacion || '',
+        fechaAutorizacion: this.formatFecha(comprobante.fecha_autorizacion),
+        ambiente: ambienteDesc,
+        tipoEmision: tipoEmisionDesc,
+        fechaEmision: this.formatFechaSolo(comprobante.fecha_emision),
+        claveAcceso: comprobante.clave_acceso || '',
+        claveAccesoAgrupada: this.agruparClave(comprobante.clave_acceso),
+        /** Lo genera Carbone con `:barcode(code128)`; queda por si se prefiere el QR. */
+        claveAccesoBarcode: extras.qrDataUri,
+        /** No se emiten guías de remisión desde aquí. */
+        guiaRemision: '',
+        /**
+         * La leyenda del pie. En pruebas dice lo único que importa decir; en
+         * producción va vacía para no ensuciar un documento con validez legal.
+         */
+        leyenda: esProduccion
+          ? ''
+          : 'DOCUMENTO EMITIDO EN AMBIENTE DE PRUEBAS — SIN VALIDEZ TRIBUTARIA',
+        estado: comprobante.estado || '',
+      },
+
+      cliente: {
+        razonSocial: comprobante.razon_social_comprador || '',
+        identificacion: comprobante.identificacion_comprador || '',
+        tipoIdentificacion: this.getTipoIdentificacionDesc(
+          comprobante.receptor_tipo_identificacion,
+        ),
+        direccion: comprobante.receptor_direccion || '',
+        telefono: comprobante.receptor_telefono || '',
+        email: comprobante.receptor_email || '',
+      },
+
+      /*
+       * ⚠️ `totales` es un **objeto**, no la lista que usaba la plantilla HTML.
+       * Es el único nombre que chocaba entre las dos formas, y gana el
+       * documento de Word porque es el que se usa.
+       */
+      totales: {
+        subtotal15: m(baseDe('4')),
+        subtotal5: m(baseDe('5')),
+        subtotal0: m(baseDe('0')),
+        subtotalNoObjeto: m(baseDe('6')),
+        subtotalExento: m(baseDe('7')),
+        subtotalSinImpuestos: m(subtotal),
+        totalDescuento: m(totalDescuento),
+        ice: m(totalIce),
+        iva15: m(ivaDe('4')),
+        iva5: m(ivaDe('5')),
+        propina: m(propina),
+        valorTotal: m(total),
+      },
+
+      // ═══ Forma plana — la que usaba la plantilla HTML ═══════════════════
       rucEmisor: comprobante.ruc_emisor || '',
       razonSocialEmisor: comprobante.razon_social_emisor || '',
       nombreComercial: comprobante.nombre_comercial || '',
@@ -295,6 +430,27 @@ export class RideService {
         codigoPrincipal: d.codigo_principal || '',
         codigoAuxiliar: d.codigo_auxiliar || '',
         descripcion: d.descripcion || '',
+        /*
+         * Los nombres cortos —`cantidad`, `precioUnitario`, `descuento`,
+         * `precioTotal`— son los que usa `ride.docx`; los `…Formato` los usaba
+         * la plantilla HTML. Ambos llevan el mismo valor ya formateado.
+         */
+        cantidad: this.formatNumero(parseFloat(d.cantidad) || 0),
+        precioUnitario: this.formatMoneda(
+          parseFloat(d.precio_unitario) || 0,
+          moneda,
+        ),
+        descuento: this.formatMoneda(parseFloat(d.descuento) || 0, moneda),
+        precioTotal: this.formatMoneda(
+          parseFloat(d.subtotal) ||
+            parseFloat(d.precio_total_sin_impuesto) ||
+            (parseFloat(d.cantidad) || 0) *
+              (parseFloat(d.precio_unitario) || 0) -
+              (parseFloat(d.descuento) || 0),
+          moneda,
+        ),
+        /** La consulta del RIDE no trae los detalles adicionales de la línea. */
+        detalleAdicional: '',
         cantidadFormato: this.formatNumero(parseFloat(d.cantidad) || 0),
         precioUnitarioFormato: this.formatMoneda(
           parseFloat(d.precio_unitario) || 0,
@@ -330,8 +486,12 @@ export class RideService {
         impuestos: impuestosByDetalle[d.id] || [],
       })),
 
-      // Totales agrupados (impuestos)
-      totales: totales.map((t) => ({
+      /*
+       * El desglose por tarifa como lista vive ahora en `totalesPorTarifa`.
+       * El nombre `totales` lo ocupa el objeto de casillas que consume el
+       * documento de Word: era el único choque entre las dos formas.
+       */
+      totalesPorTarifa: totales.map((t) => ({
         codigo: t.codigo || '',
         descripcion: this.getImpuestoDescripcion(t.codigo),
         codigoPorcentaje: t.codigo_porcentaje || '',
@@ -343,9 +503,16 @@ export class RideService {
         valorFormato: this.formatMoneda(parseFloat(t.valor) || 0, moneda),
       })),
 
-      // Pagos
+      /*
+       * Cada pago lleva las claves con los dos nombres. `descripcion` y `total`
+       * son los que usa `ride.docx`; los `…Formato` los usaba la plantilla HTML.
+       * Duplicar dos cadenas por pago no cuesta nada y evita que cambiar de
+       * plantilla obligue a tocar este mapeo.
+       */
       pagos: pagos.map((p) => ({
         formaPago: p.forma_pago || '',
+        descripcion: this.getFormaPagoDescripcion(p.forma_pago),
+        total: this.formatMoneda(parseFloat(p.total) || 0, moneda),
         formaPagoDescripcion: this.getFormaPagoDescripcion(p.forma_pago),
         totalFormato: this.formatMoneda(parseFloat(p.total) || 0, moneda),
         plazo: p.plazo ? String(p.plazo) : '',
