@@ -46,7 +46,13 @@ docker-compose*.yml
 .dockerignore
 
 # Data directories (mounted as volumes)
-templates
+#
+# `templates` NO está aquí a propósito: las plantillas del RIDE son código, se
+# versionan con la aplicación y tienen que viajar en la imagen. Estaban
+# excluidas y el resultado era que `/data/templates` quedaba vacío y **ningún
+# RIDE se podía generar** («No se encontró ningún template con ID: ride»).
+#
+# Los de abajo sí son datos: los escribe la aplicación en tiempo de ejecución.
 pdfs
 certs
 

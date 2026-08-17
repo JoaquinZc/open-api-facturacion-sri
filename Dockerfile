@@ -52,6 +52,19 @@ COPY --from=builder /app/dist ./dist
 # Copy DB schema — lo lee dist/scripts/db-bootstrap.js en el arranque
 COPY --from=builder /app/database ./database
 
+# Plantillas del RIDE. **Van en la imagen, no en el volumen**: son código, se
+# versionan con la aplicación y deben actualizarse al desplegar.
+#
+# Estaban solo en el repositorio y nunca se copiaban aquí, así que el servicio
+# arrancaba con `TEMPLATES_DIR` apuntando a un `/data/templates` vacío y todo
+# RIDE moría con «No se encontró ningún template con ID: ride». Copiarlas al
+# volumen tampoco valdría: Railway lo monta encima al arrancar y las taparía.
+COPY --from=builder /app/templates ./templates
+
+# Dónde buscarlas. Se fija aquí para que un despliegue nuevo funcione sin
+# depender de que alguien acierte la variable en el panel.
+ENV TEMPLATES_DIR=/app/templates
+
 # Create directories for volumes
 RUN mkdir -p /data/templates /data/pdfs /data/certs /data/xmls \
     /data/pdfs/con_firma /data/pdfs/others /data/pdfs/documents /data/pdfs/images
