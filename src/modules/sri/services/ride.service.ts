@@ -1,5 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as QRCode from 'qrcode';
+// `bwip-js` es CommonJS puro (`export = BwipJs`), así que va como import por
+// defecto y no con `* as` — con `esModuleInterop` activo, esa forma no compila.
+import bwipjs from 'bwip-js';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { PdfService } from '../../pdf/pdf.service';
@@ -63,7 +66,9 @@ export class RideService {
      * disco: el mapeo de abajo es una transformación pura y conviene que siga
      * siéndolo.
      */
-    const qrDataUri = await this.generarQr(comprobante.clave_acceso as string);
+    const clave = comprobante.clave_acceso as string;
+    const qrDataUri = await this.generarQr(clave);
+    const barcodeDataUri = await this.generarBarcode(clave);
     const logoDataUri = this.cargarLogo(comprobante.ruc_emisor as string);
 
     const rideData = this.mapComprobanteToRideData(
@@ -73,7 +78,7 @@ export class RideService {
       impuestos,
       pagos,
       infoAdicional,
-      { qrDataUri, logoDataUri },
+      { qrDataUri, barcodeDataUri, logoDataUri },
     );
 
     const templatePath = this.templateService.findTemplate(
@@ -106,12 +111,9 @@ export class RideService {
    * quien convierte esto a PDF— renderiza imágenes de forma fiable y todo lo
    * demás no.
    *
-   * ⚠️ La ficha técnica del SRI describe un **código de barras** (GS1-128) para
-   * la clave de acceso. Aquí va un QR porque `qrcode` ya es una dependencia del
-   * proyecto y el código de barras exigiría añadir otra que no se puede
-   * verificar sin desplegar. Los 49 dígitos impresos —que son la parte que
-   * exige la norma— están junto al QR. Si se quiere el Code 128, es cambiar
-   * este método.
+   * **El código que exige la norma es el de barras**, y lo genera
+   * `generarBarcode()`. Este QR se mantiene disponible por si se quiere añadir
+   * al lado —algunos RIDE llevan los dos— pero la plantilla no lo usa hoy.
    *
    * Si falla, **no tumba el RIDE**: se devuelve un píxel transparente. Un
    * comprobante sin QR sigue siendo válido; uno que no se genera, no existe.
@@ -128,6 +130,50 @@ export class RideService {
     } catch (error) {
       this.logger.warn(
         `No se pudo generar el QR de ${claveAcceso}: ${(error as Error).message}`,
+      );
+      return RideService.PIXEL_TRANSPARENTE;
+    }
+  }
+
+  /**
+   * El código de barras de la clave de acceso, como PNG embebido.
+   *
+   * **Code 128, que es la simbología que describe la ficha técnica del SRI.**
+   *
+   * Se genera aquí y viaja como Data URI, igual que el logo. La alternativa era
+   * el formatter `:barcode()` de Carbone, y no sirve: está reservado a la
+   * edición Enterprise y el contenedor corre en Community, donde **tumba el
+   * render entero** en vez de omitir la imagen.
+   *
+   * `bwip-js` no arrastra ninguna dependencia y no necesita `canvas` ni módulos
+   * nativos: trae su propio codificador PNG.
+   *
+   * Si falla, **no se queda sin RIDE**: devuelve un píxel transparente. Un
+   * comprobante sin código de barras sigue siendo válido —los 49 dígitos
+   * impresos son lo que exige la norma—; uno que no se genera, no existe.
+   */
+  private async generarBarcode(claveAcceso: string): Promise<string> {
+    if (!claveAcceso) return RideService.PIXEL_TRANSPARENTE;
+
+    try {
+      const png = await bwipjs.toBuffer({
+        bcid: 'code128',
+        text: claveAcceso,
+        /*
+         * Bajo y ancho, como en cualquier RIDE: se lee con la pistola apoyada
+         * en el papel, no a distancia. Con 49 dígitos, Code 128 en modo
+         * numérico ronda los 90 mm de ancho, que caben de sobra en un A4.
+         */
+        height: 12,
+        scale: 3,
+        includetext: false,
+        backgroundcolor: 'FFFFFF',
+      });
+
+      return `data:image/png;base64,${png.toString('base64')}`;
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo generar el código de barras de ${claveAcceso}: ${(error as Error).message}`,
       );
       return RideService.PIXEL_TRANSPARENTE;
     }
@@ -176,7 +222,11 @@ export class RideService {
     pagos: any[],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     infoAdicional: any[],
-    extras: { qrDataUri: string; logoDataUri: string },
+    extras: {
+      qrDataUri: string;
+      barcodeDataUri: string;
+      logoDataUri: string;
+    },
   ): AnyRecord {
     const esProduccion = comprobante.ambiente === Ambiente.PRODUCCION;
 
@@ -317,6 +367,8 @@ export class RideService {
         /**
          * El código que acompaña a la clave de acceso, como imagen embebida.
          *
+         * Code 128 de los 49 dígitos, que es lo que describe la ficha técnica.
+         *
          * 🔴 **No se usa `:barcode(code128)` de Carbone.** Es una función de la
          * edición Enterprise, y el contenedor corre en Community:
          *
@@ -327,17 +379,10 @@ export class RideService {
          * fallo **tumba el render completo con un 500**: no se pierde solo esa
          * imagen, no sale ningún RIDE.
          *
-         * Así que la imagen viaja ya generada, por el mismo camino que el logo
-         * —un Data URI en el texto alternativo—, que es mecanismo probado.
-         *
-         * ⚠️ Hoy es un **QR**, no el Code 128 que describe la ficha técnica del
-         * SRI. Para tener el código de barras hay dos caminos: licenciar Carbone
-         * Enterprise, o generarlo aquí con una librería y seguir mandándolo por
-         * este mismo campo — la plantilla no habría que tocarla. Los 49 dígitos
-         * impresos, que son la parte que exige la norma, están en el documento
-         * en cualquier caso.
+         * Por eso viaja ya generada, por el mismo camino que el logo: un Data
+         * URI en el texto alternativo, que es mecanismo probado.
          */
-        claveAccesoBarcode: extras.qrDataUri,
+        claveAccesoBarcode: extras.barcodeDataUri,
         /** No se emiten guías de remisión desde aquí. */
         guiaRemision: '',
         /**
