@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import FormData from 'form-data';
-import { createReadStream } from 'fs';
+import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
 import { PdfImageService } from './pdf-image.service';
 
@@ -48,7 +48,8 @@ export class PdfService {
   ): Promise<Buffer> {
     // 1. Upload template to Carbone
     const formData = new FormData();
-    const templateStream = createReadStream(templatePath);
+    // Buffer y no flujo: es lo que permite calcular `Content-Length` (ver abajo).
+    const templateBuffer = readFileSync(templatePath);
     const ext = extname(templatePath).toLowerCase();
     const contentTypes: Record<string, string> = {
       '.docx':
@@ -58,19 +59,42 @@ export class PdfService {
       '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
     };
-    formData.append('template', templateStream, {
+    formData.append('template', templateBuffer, {
       filename: basename(templatePath),
       contentType: contentTypes[ext] || 'application/octet-stream',
     });
+
+    /**
+     * **Se manda con `Content-Length`, no troceado.**
+     *
+     * Con un `createReadStream`, `form-data` no puede saber el tamaño por
+     * adelantado y axios envía la petición con `Transfer-Encoding: chunked`.
+     * Carbone la acepta y le asigna un identificador, pero el fichero **no llega
+     * a escribirse**; luego, al verificar el tipo, falla con
+     * `ENOENT: open '/app/template/c_…'` y responde 415 «tipo no soportado» —
+     * un mensaje que apunta al formato de la plantilla cuando el problema es
+     * que no hay plantilla.
+     *
+     * Leerla a memoria permite calcular la longitud. Son unos pocos KB de HTML,
+     * así que el coste es irrelevante frente a que el RIDE no se genere.
+     */
+    const headers: Record<string, string> = {
+      ...formData.getHeaders(),
+      Accept: 'application/json',
+    };
+
+    try {
+      headers['Content-Length'] = String(formData.getLengthSync());
+    } catch {
+      // Solo se puede calcular si todas las partes son buffers o cadenas. Si
+      // alguna fuera un flujo, se envía como antes en vez de romper.
+    }
 
     const templateResponse = await axios.post(
       `${this.carboneApi}/template`,
       formData,
       {
-        headers: {
-          ...formData.getHeaders(),
-          Accept: 'application/json',
-        },
+        headers,
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
       },
