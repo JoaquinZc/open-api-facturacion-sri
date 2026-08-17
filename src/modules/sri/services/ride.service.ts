@@ -4,14 +4,18 @@ import * as QRCode from 'qrcode';
 // defecto y no con `* as` — con `esModuleInterop` activo, esa forma no compila.
 import bwipjs from 'bwip-js';
 import { existsSync, readFileSync } from 'fs';
+import { lookup } from 'dns/promises';
 import { join } from 'path';
 import { PdfService } from '../../pdf/pdf.service';
 import { TemplateService } from '../../template/template.service';
 import { SriRepositoryService } from './sri-repository.service';
 import { TIPO_COMPROBANTE_DESCRIPCIONES } from '../constants';
-import { Ambiente, TipoEmision, TipoIdentificacion } from '../constants/sri.enums';
+import {
+  Ambiente,
+  TipoEmision,
+  TipoIdentificacion,
+} from '../constants/sri.enums';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = Record<string, any>;
 
 @Injectable()
@@ -19,14 +23,6 @@ export class RideService {
   private readonly logger = new Logger(RideService.name);
   private static readonly RIDE_TEMPLATE_ID = 'ride';
 
-  /**
-   * PNG de 1×1 transparente.
-   *
-   * Se usa cuando no hay logo o el QR falla. **Es mejor que una cadena vacía**:
-   * un `src=""` deja en LibreOffice el hueco de una imagen rota, y obligaría a
-   * poner condicionales en la plantilla — que es justo lo que no se quiere,
-   * porque un condicional mal escrito en Carbone imprime el marcador en el PDF.
-   */
   /**
    * PNG de 1×1 transparente.
    *
@@ -59,6 +55,19 @@ export class RideService {
    */
   private static readonly LOGO_MAX_BYTES = 2 * 1024 * 1024;
 
+  /** Cada salto se vuelve a validar; tres bastan para cualquier CDN real. */
+  private static readonly LOGO_MAX_REDIRECCIONES = 3;
+
+  /**
+   * Tope de la caché.
+   *
+   * Sin él, la caché crece con **cada URL distinta que se haya visto**, y quien
+   * pueda cambiar la suya la llena sola: es memoria que no se libera nunca en
+   * un proceso de vida larga. Con el tope se descarta la entrada más antigua,
+   * que como mucho cuesta una descarga de más.
+   */
+  private static readonly LOGO_CACHE_MAX = 200;
+
   constructor(
     private readonly pdfService: PdfService,
     private readonly templateService: TemplateService,
@@ -74,19 +83,21 @@ export class RideService {
     const comprobante =
       await this.repository.findComprobanteConDetalles(claveAcceso);
     if (!comprobante) {
-      throw new NotFoundException(
-        `Comprobante ${claveAcceso} no encontrado`,
-      );
+      throw new NotFoundException(`Comprobante ${claveAcceso} no encontrado`);
     }
 
-    const detalles =
-      await this.repository.findDetallesByComprobanteId(comprobante.id);
-    const totales =
-      await this.repository.findTotalesByComprobanteId(comprobante.id);
-    const impuestos =
-      await this.repository.findImpuestosByComprobanteId(comprobante.id);
-    const pagos =
-      await this.repository.findPagosByComprobanteId(comprobante.id);
+    const detalles = await this.repository.findDetallesByComprobanteId(
+      comprobante.id,
+    );
+    const totales = await this.repository.findTotalesByComprobanteId(
+      comprobante.id,
+    );
+    const impuestos = await this.repository.findImpuestosByComprobanteId(
+      comprobante.id,
+    );
+    const pagos = await this.repository.findPagosByComprobanteId(
+      comprobante.id,
+    );
     const infoAdicional =
       await this.repository.findInfoAdicionalByComprobanteId(comprobante.id);
 
@@ -134,7 +145,7 @@ export class RideService {
      * texto alternativo se sigue usando —es como se localiza cada hueco—, pero
      * la sustitución la hace `docx-imagenes.ts`, que sí se puede verificar.
      */
-    return this.pdfService.generatePDF(rideData as AnyRecord, templatePath, {
+    return this.pdfService.generatePDF(rideData, templatePath, {
       '{d.factura.claveAccesoBarcode}': barcode,
       '{d.emisor.logo}': logo,
     });
@@ -275,7 +286,14 @@ export class RideService {
     const remoto = await this.descargarLogo(logoUrl);
     if (remoto) return remoto;
 
-    if (!rucEmisor) return RideService.PIXEL_TRANSPARENTE;
+    /*
+     * El RUC entra en una ruta de fichero, así que se exige que sean **trece
+     * dígitos y nada más**. Hoy la columna ya lo garantiza —`varchar(13)` con
+     * `@Matches(/^\d{13}$/)` en el DTO—, pero eso está a cuatro archivos de
+     * distancia: un `../../` aquí sería lectura arbitraria del contenedor, y la
+     * comprobación cuesta una línea.
+     */
+    if (!/^\d{13}$/.test(rucEmisor)) return RideService.PIXEL_TRANSPARENTE;
 
     try {
       const ruta = join(
@@ -312,47 +330,153 @@ export class RideService {
     if (cacheado !== undefined) return cacheado;
 
     const resultado = await this.traerLogo(limpia);
+
+    // Se descarta la entrada más antigua: un `Map` conserva el orden de
+    // inserción, así que la primera clave es la que lleva más tiempo dentro.
+    if (RideService.cacheDeLogos.size >= RideService.LOGO_CACHE_MAX) {
+      const masVieja = RideService.cacheDeLogos.keys().next().value;
+      if (masVieja !== undefined) RideService.cacheDeLogos.delete(masVieja);
+    }
+
     RideService.cacheDeLogos.set(limpia, resultado);
     return resultado;
   }
 
+  /**
+   * ¿Esta dirección sale de verdad a internet?
+   *
+   * 🔴 **Esto es lo que separa «descargar un logo» de un SSRF.** Sin la
+   * comprobación, una URL en la ficha de un emisor convierte a este servicio en
+   * un cliente HTTP que alguien más dirige: `http://169.254.169.254/…` son las
+   * credenciales de la instancia en la nube, `http://….railway.internal` es la
+   * red privada del despliegue, y `http://127.0.0.1:3000/…` es esta misma API
+   * saltándose el proxy. La respuesta acabaría impresa en un PDF.
+   *
+   * Se comprueba la **IP resuelta**, no el nombre: `logo.example.com` puede
+   * apuntar a `127.0.0.1` sin que la URL lo delate.
+   */
+  private esDireccionPublica(ip: string): boolean {
+    // IPv4
+    const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+    if (v4) {
+      const [a, b] = v4.slice(1).map(Number);
+      if (a === 10 || a === 127 || a === 0) return false;
+      if (a === 172 && b >= 16 && b <= 31) return false;
+      if (a === 192 && b === 168) return false;
+      if (a === 169 && b === 254) return false; // enlace local y metadatos
+      if (a === 100 && b >= 64 && b <= 127) return false; // CGNAT
+      if (a >= 224) return false; // multidifusión y reservadas
+      return true;
+    }
+
+    // IPv6
+    const v6 = ip.toLowerCase();
+    if (v6 === '::1' || v6 === '::') return false;
+    if (v6.startsWith('fe80')) return false; // enlace local
+    if (/^f[cd]/.test(v6)) return false; // únicas locales
+    // `::ffff:127.0.0.1` — IPv4 disfrazada de IPv6.
+    const mapeada = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v6);
+    if (mapeada) return this.esDireccionPublica(mapeada[1]);
+
+    return true;
+  }
+
+  /** Resuelve el nombre y exige que **todas** sus direcciones sean públicas. */
+  private async destinoPermitido(u: URL): Promise<boolean> {
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      this.logger.warn(`Logo con protocolo no admitido: ${u.protocol}`);
+      return false;
+    }
+
+    try {
+      const direcciones = await lookup(u.hostname, { all: true });
+
+      // Todas, no la primera: un nombre con varias A puede mezclar una pública
+      // y una privada, y cuál usa la petición no lo decide este código.
+      if (!direcciones.every((d) => this.esDireccionPublica(d.address))) {
+        this.logger.warn(
+          `Logo rechazado: ${u.hostname} resuelve a una dirección de red interna.`,
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo resolver ${u.hostname}: ${(error as Error).message}`,
+      );
+      return false;
+    }
+  }
+
   private async traerLogo(url: string): Promise<Buffer | null> {
     try {
-      // Solo HTTP(S). Sin esto, un `file://` en la ficha de un emisor sería un
-      // lector de ficheros del contenedor a través de una URL que escribe el
-      // dueño de un negocio.
-      const parsed = new URL(url);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        this.logger.warn(`Logo con protocolo no admitido: ${parsed.protocol}`);
-        return null;
+      let actual = new URL(url);
+
+      /*
+       * Las redirecciones se siguen **a mano**. Con `redirect: 'follow'` la
+       * comprobación de arriba solo valdría para el primer salto: un servidor
+       * público puede responder `302` a `http://169.254.169.254/…` y el
+       * destino real nunca pasaría por el filtro.
+       */
+      for (
+        let salto = 0;
+        salto <= RideService.LOGO_MAX_REDIRECCIONES;
+        salto++
+      ) {
+        if (!(await this.destinoPermitido(actual))) return null;
+
+        const respuesta = await fetch(actual, {
+          signal: AbortSignal.timeout(RideService.LOGO_TIMEOUT_MS),
+          redirect: 'manual',
+        });
+
+        if (respuesta.status >= 300 && respuesta.status < 400) {
+          const destino = respuesta.headers.get('location');
+          if (!destino) return null;
+          actual = new URL(destino, actual);
+          continue;
+        }
+
+        if (!respuesta.ok) {
+          this.logger.warn(`El logo ${url} respondió ${respuesta.status}`);
+          return null;
+        }
+
+        const tipo = respuesta.headers.get('content-type') ?? '';
+        if (!tipo.startsWith('image/')) {
+          this.logger.warn(`El logo ${url} no es una imagen (${tipo})`);
+          return null;
+        }
+
+        /*
+         * Se corta por `Content-Length` **antes** de leer el cuerpo. Sin esto,
+         * un servidor puede mandar gigabytes y el tope solo se comprobaría con
+         * todo ya en memoria — que es justo lo que el tope quería evitar.
+         */
+        const declarado = Number(respuesta.headers.get('content-length') ?? 0);
+        if (declarado > RideService.LOGO_MAX_BYTES) {
+          this.logger.warn(
+            `El logo ${url} declara ${declarado} bytes; el máximo son ${RideService.LOGO_MAX_BYTES}.`,
+          );
+          return null;
+        }
+
+        const bytes = Buffer.from(await respuesta.arrayBuffer());
+
+        // Y otra vez con los bytes reales: `Content-Length` puede mentir o no venir.
+        if (bytes.byteLength > RideService.LOGO_MAX_BYTES) {
+          this.logger.warn(
+            `El logo ${url} pesa ${bytes.byteLength} bytes; el máximo son ${RideService.LOGO_MAX_BYTES}.`,
+          );
+          return null;
+        }
+
+        return bytes;
       }
 
-      const respuesta = await fetch(url, {
-        signal: AbortSignal.timeout(RideService.LOGO_TIMEOUT_MS),
-        redirect: 'follow',
-      });
-
-      if (!respuesta.ok) {
-        this.logger.warn(`El logo ${url} respondió ${respuesta.status}`);
-        return null;
-      }
-
-      const tipo = respuesta.headers.get('content-type') ?? '';
-      if (!tipo.startsWith('image/')) {
-        this.logger.warn(`El logo ${url} no es una imagen (${tipo})`);
-        return null;
-      }
-
-      const bytes = Buffer.from(await respuesta.arrayBuffer());
-
-      if (bytes.byteLength > RideService.LOGO_MAX_BYTES) {
-        this.logger.warn(
-          `El logo ${url} pesa ${bytes.byteLength} bytes; el máximo son ${RideService.LOGO_MAX_BYTES}.`,
-        );
-        return null;
-      }
-
-      return bytes;
+      this.logger.warn(`El logo ${url} encadena demasiadas redirecciones.`);
+      return null;
     } catch (error) {
       this.logger.warn(
         `No se pudo traer el logo ${url}: ${(error as Error).message}`,
@@ -361,19 +485,17 @@ export class RideService {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapComprobanteToRideData(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     comprobante: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     detalles: any[],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     totales: any[],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     impuestos: any[],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     pagos: any[],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     infoAdicional: any[],
     /**
      * El logo y el código de barras **ya no viajan aquí**: se meten en la
@@ -410,10 +532,11 @@ export class RideService {
     const totalImpuestos = parseFloat(comprobante.total_impuestos) || 0;
     const total = parseFloat(comprobante.total) || 0;
     const propina = parseFloat(comprobante.propina) || 0;
-    const moneda = comprobante.moneda === 'DOLAR' ? 'USD' : (comprobante.moneda || 'USD');
+    const moneda =
+      comprobante.moneda === 'DOLAR' ? 'USD' : comprobante.moneda || 'USD';
 
     // Group impuestos by detalle_id for embedding in detalles
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const impuestosByDetalle: Record<string, any[]> = {};
     for (const imp of impuestos) {
       const key = imp.comprobante_detalle_id;
@@ -422,7 +545,10 @@ export class RideService {
         codigo: imp.codigo || '',
         codigoPorcentaje: imp.codigo_porcentaje || '',
         tarifa: parseFloat(imp.tarifa) || 0,
-        baseImponibleFormato: this.formatMoneda(parseFloat(imp.base_imponible) || 0, moneda),
+        baseImponibleFormato: this.formatMoneda(
+          parseFloat(imp.base_imponible) || 0,
+          moneda,
+        ),
         valorFormato: this.formatMoneda(parseFloat(imp.valor) || 0, moneda),
       });
     }
@@ -442,12 +568,16 @@ export class RideService {
      */
     const baseDe = (cp: string): number =>
       totales
-        .filter((t) => String(t.codigo) === '2' && String(t.codigo_porcentaje) === cp)
+        .filter(
+          (t) => String(t.codigo) === '2' && String(t.codigo_porcentaje) === cp,
+        )
         .reduce((s, t) => s + (parseFloat(t.base_imponible) || 0), 0);
 
     const ivaDe = (cp: string): number =>
       totales
-        .filter((t) => String(t.codigo) === '2' && String(t.codigo_porcentaje) === cp)
+        .filter(
+          (t) => String(t.codigo) === '2' && String(t.codigo_porcentaje) === cp,
+        )
         .reduce((s, t) => s + (parseFloat(t.valor) || 0), 0);
 
     const totalIce = totales
@@ -594,11 +724,26 @@ export class RideService {
       razonSocialEmisor: comprobante.razon_social_emisor || '',
       nombreComercial: comprobante.nombre_comercial || '',
       direccionMatriz: comprobante.direccion_matriz || '',
-      direccionEstablecimiento: comprobante.direccion_establecimiento || comprobante.direccion_matriz || '',
-      obligadoContabilidad: comprobante.obligado_contabilidad === true || comprobante.obligado_contabilidad === 'true' ? 'SI' : 'NO',
+      direccionEstablecimiento:
+        comprobante.direccion_establecimiento ||
+        comprobante.direccion_matriz ||
+        '',
+      obligadoContabilidad:
+        comprobante.obligado_contabilidad === true ||
+        comprobante.obligado_contabilidad === 'true'
+          ? 'SI'
+          : 'NO',
       contribuyenteEspecial: comprobante.contribuyente_especial || '',
-      agenteRetencion: comprobante.agente_retencion === true || comprobante.agente_retencion === 'true' ? 'SI' : '',
-      contribuyenteRimpe: comprobante.contribuyente_rimpe === true || comprobante.contribuyente_rimpe === 'true' ? 'SI' : '',
+      agenteRetencion:
+        comprobante.agente_retencion === true ||
+        comprobante.agente_retencion === 'true'
+          ? 'SI'
+          : '',
+      contribuyenteRimpe:
+        comprobante.contribuyente_rimpe === true ||
+        comprobante.contribuyente_rimpe === 'true'
+          ? 'SI'
+          : '',
 
       // Comprobante
       tipoComprobanteDescripcion: tipoCompDesc,
@@ -643,7 +788,9 @@ export class RideService {
       // Comprador
       razonSocialComprador: comprobante.razon_social_comprador || '',
       identificacionComprador: comprobante.identificacion_comprador || '',
-      tipoIdentificacionComprador: this.getTipoIdentificacionDesc(comprobante.receptor_tipo_identificacion),
+      tipoIdentificacionComprador: this.getTipoIdentificacionDesc(
+        comprobante.receptor_tipo_identificacion,
+      ),
       receptorDireccion: comprobante.receptor_direccion || '',
       receptorEmail: comprobante.receptor_email || '',
       receptorTelefono: comprobante.receptor_telefono || '',
