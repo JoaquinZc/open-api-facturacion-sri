@@ -314,7 +314,24 @@ export class RideService {
         fechaEmision: this.formatFechaSolo(comprobante.fecha_emision),
         claveAcceso: comprobante.clave_acceso || '',
         claveAccesoAgrupada: this.agruparClave(comprobante.clave_acceso),
-        /** Lo genera Carbone con `:barcode(code128)`; queda por si se prefiere el QR. */
+        /**
+         * El código que acompaña a la clave de acceso, como imagen embebida.
+         *
+         * 🔴 **No se usa `:barcode(code128)` de Carbone.** Ese formatter existe
+         * desde Carbone 5.13.0 —10 de agosto de 2026— y solo en la edición
+         * Enterprise. El contenedor desplegado es anterior: al pedirle un
+         * formatter que no conoce, **falla el render entero con un 500** y no
+         * sale ningún RIDE, no solo el código.
+         *
+         * Así que la imagen viaja ya generada, por el mismo camino que el logo
+         * —un Data URI en el texto alternativo—, que es mecanismo probado.
+         *
+         * ⚠️ Hoy es un **QR**, no el Code 128 que describe la ficha técnica del
+         * SRI. Para el código de barras hacen falta dos cosas: subir Carbone a
+         * 5.13+ y volver a poner el formatter, o añadir una librería que lo
+         * genere aquí. Los 49 dígitos impresos —la parte que exige la norma—
+         * están en el documento en cualquier caso.
+         */
         claveAccesoBarcode: extras.qrDataUri,
         /** No se emiten guías de remisión desde aquí. */
         guiaRemision: '',
