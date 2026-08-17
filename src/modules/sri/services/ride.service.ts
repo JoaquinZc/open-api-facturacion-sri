@@ -1,4 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import * as QRCode from 'qrcode';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { PdfService } from '../../pdf/pdf.service';
 import { TemplateService } from '../../template/template.service';
 import { SriRepositoryService } from './sri-repository.service';
@@ -12,6 +15,17 @@ type AnyRecord = Record<string, any>;
 export class RideService {
   private readonly logger = new Logger(RideService.name);
   private static readonly RIDE_TEMPLATE_ID = 'ride';
+
+  /**
+   * PNG de 1×1 transparente.
+   *
+   * Se usa cuando no hay logo o el QR falla. **Es mejor que una cadena vacía**:
+   * un `src=""` deja en LibreOffice el hueco de una imagen rota, y obligaría a
+   * poner condicionales en la plantilla — que es justo lo que no se quiere,
+   * porque un condicional mal escrito en Carbone imprime el marcador en el PDF.
+   */
+  private static readonly PIXEL_TRANSPARENTE =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
   constructor(
     private readonly pdfService: PdfService,
@@ -44,6 +58,14 @@ export class RideService {
     const infoAdicional =
       await this.repository.findInfoAdicionalByComprobanteId(comprobante.id);
 
+    /*
+     * El QR y el logo se preparan aquí porque uno es asíncrono y el otro lee
+     * disco: el mapeo de abajo es una transformación pura y conviene que siga
+     * siéndolo.
+     */
+    const qrDataUri = await this.generarQr(comprobante.clave_acceso as string);
+    const logoDataUri = this.cargarLogo(comprobante.ruc_emisor as string);
+
     const rideData = this.mapComprobanteToRideData(
       comprobante,
       detalles,
@@ -51,6 +73,7 @@ export class RideService {
       impuestos,
       pagos,
       infoAdicional,
+      { qrDataUri, logoDataUri },
     );
 
     const templatePath = this.templateService.findTemplate(
@@ -64,8 +87,81 @@ export class RideService {
   }
 
   /**
-   * Mapea los datos del comprobante al formato requerido por el template RIDE
+   * Los 49 dígitos en grupos de siete.
+   *
+   * **No es decoración.** Es la única forma de que alguien pueda dictarlos por
+   * teléfono o teclearlos en sri.gob.ec sin perder la cuenta, que es justo para
+   * lo que sirve la clave de acceso. Una tira de 49 cifras seguidas se lee mal
+   * en papel y peor en una pantalla pequeña.
    */
+  private agruparClave(clave: unknown): string {
+    const digitos = String(clave ?? '').replace(/\D/g, '');
+    return digitos.replace(/(.{7})/g, '$1 ').trim();
+  }
+
+  /**
+   * El QR de la clave de acceso, como PNG embebido.
+   *
+   * **Va como imagen y no como fuente ni dibujo HTML**: LibreOffice —que es
+   * quien convierte esto a PDF— renderiza imágenes de forma fiable y todo lo
+   * demás no.
+   *
+   * ⚠️ La ficha técnica del SRI describe un **código de barras** (GS1-128) para
+   * la clave de acceso. Aquí va un QR porque `qrcode` ya es una dependencia del
+   * proyecto y el código de barras exigiría añadir otra que no se puede
+   * verificar sin desplegar. Los 49 dígitos impresos —que son la parte que
+   * exige la norma— están junto al QR. Si se quiere el Code 128, es cambiar
+   * este método.
+   *
+   * Si falla, **no tumba el RIDE**: se devuelve un píxel transparente. Un
+   * comprobante sin QR sigue siendo válido; uno que no se genera, no existe.
+   */
+  private async generarQr(claveAcceso: string): Promise<string> {
+    if (!claveAcceso) return RideService.PIXEL_TRANSPARENTE;
+
+    try {
+      return await QRCode.toDataURL(claveAcceso, {
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: 240,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo generar el QR de ${claveAcceso}: ${(error as Error).message}`,
+      );
+      return RideService.PIXEL_TRANSPARENTE;
+    }
+  }
+
+  /**
+   * El logo del emisor, si lo tiene.
+   *
+   * Se busca por RUC en `{TEMPLATES_DIR}/logos/{ruc}.png`. Es deliberadamente
+   * simple: las plantillas ya viajan en la imagen, así que añadir un logo es
+   * dejar un fichero al lado, sin tocar la base de datos ni el despliegue.
+   *
+   * Sin logo se devuelve un píxel transparente en vez de una cadena vacía: así
+   * la plantilla no necesita preguntar y no queda el hueco de una imagen rota.
+   */
+  private cargarLogo(rucEmisor: string): string {
+    if (!rucEmisor) return RideService.PIXEL_TRANSPARENTE;
+
+    try {
+      const ruta = join(
+        this.templateService.templatesDir,
+        'logos',
+        `${rucEmisor}.png`,
+      );
+
+      if (!existsSync(ruta)) return RideService.PIXEL_TRANSPARENTE;
+
+      const png = readFileSync(ruta).toString('base64');
+      return `data:image/png;base64,${png}`;
+    } catch {
+      return RideService.PIXEL_TRANSPARENTE;
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapComprobanteToRideData(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,11 +176,21 @@ export class RideService {
     pagos: any[],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     infoAdicional: any[],
+    extras: { qrDataUri: string; logoDataUri: string },
   ): AnyRecord {
-    const ambienteDesc =
-      comprobante.ambiente === Ambiente.PRODUCCION
-        ? 'PRODUCCI\u00d3N'
-        : 'PRUEBAS';
+    const esProduccion = comprobante.ambiente === Ambiente.PRODUCCION;
+
+    /*
+     * En pruebas la advertencia viaja **dentro del propio texto del ambiente**.
+     *
+     * Antes era una etiqueta peque\u00f1a que dec\u00eda \u00abPRUEBAS\u00bb y poco m\u00e1s. Un
+     * comprobante de pruebas no tiene ninguna validez tributaria, y entregarle
+     * uno a un cliente creyendo que es real es un problema serio; que lo diga
+     * donde se mira el n\u00famero cuesta lo mismo que no decirlo.
+     */
+    const ambienteDesc = esProduccion
+      ? 'PRODUCCI\u00d3N'
+      : 'PRUEBAS \u2014 SIN VALIDEZ TRIBUTARIA';
 
     const tipoEmisionDesc =
       comprobante.tipo_emision === TipoEmision.CONTINGENCIA
@@ -137,8 +243,31 @@ export class RideService {
       puntoEmision: comprobante.punto_emision || '',
       secuencial: comprobante.secuencial || '',
       numeroComprobante: `${comprobante.establecimiento || ''}-${comprobante.punto_emision || ''}-${comprobante.secuencial || ''}`,
-      fechaEmisionFormato: this.formatFecha(comprobante.fecha_emision),
+      fechaEmisionFormato: this.formatFechaSolo(comprobante.fecha_emision),
       claveAcceso: comprobante.clave_acceso || '',
+      claveAccesoAgrupada: this.agruparClave(comprobante.clave_acceso),
+      qrDataUri: extras.qrDataUri,
+      logoDataUri: extras.logoDataUri,
+      /**
+       * Las menciones que solo aparecen si el emisor las tiene, ya resueltas en
+       * una sola cadena. **La plantilla no decide**: un condicional mal escrito
+       * en Carbone no falla, imprime el marcador en el PDF.
+       */
+      emisorLeyendas: [
+        comprobante.contribuyente_especial
+          ? `CONTRIBUYENTE ESPECIAL Nº ${comprobante.contribuyente_especial}`
+          : '',
+        comprobante.contribuyente_rimpe === true ||
+        comprobante.contribuyente_rimpe === 'true'
+          ? 'CONTRIBUYENTE RÉGIMEN RIMPE'
+          : '',
+        comprobante.agente_retencion === true ||
+        comprobante.agente_retencion === 'true'
+          ? 'AGENTE DE RETENCIÓN'
+          : '',
+      ]
+        .filter(Boolean)
+        .join('  ·  '),
       estado: comprobante.estado || '',
       numAutorizacion: comprobante.num_autorizacion || '',
       fechaAutorizacionFormato: this.formatFecha(
@@ -175,8 +304,27 @@ export class RideService {
           parseFloat(d.descuento) || 0,
           moneda,
         ),
+        /**
+         * El subtotal de la línea.
+         *
+         * 🔴 **Se lee `d.subtotal`, no `d.precio_total_sin_impuesto`.** La
+         * consulta lo devuelve con alias —`precio_total_sin_impuesto AS
+         * subtotal` en `findDetallesByComprobanteId`—, así que el nombre de la
+         * columna no existe en la fila. `parseFloat(undefined) || 0` daba cero
+         * **sin fallar**, y el RIDE imprimía `$0.00` en todas las líneas
+         * mientras los totales de abajo salían bien: una factura que se
+         * contradice a sí misma delante del cliente.
+         *
+         * El respaldo recalcula `cantidad × precio − descuento`, que es la
+         * definición del campo. Un documento fiscal no debería quedar mal por
+         * un dato derivado que no se guardó.
+         */
         subtotalFormato: this.formatMoneda(
-          parseFloat(d.precio_total_sin_impuesto) || 0,
+          parseFloat(d.subtotal) ||
+            parseFloat(d.precio_total_sin_impuesto) ||
+            (parseFloat(d.cantidad) || 0) *
+              (parseFloat(d.precio_unitario) || 0) -
+              (parseFloat(d.descuento) || 0),
           moneda,
         ),
         impuestos: impuestosByDetalle[d.id] || [],
@@ -215,6 +363,17 @@ export class RideService {
   /**
    * Formatea una fecha al formato DD/MM/YYYY HH:mm:ss
    */
+  /**
+   * Fecha **sin hora**, para la emisión.
+   *
+   * La fecha de emisión de un comprobante es un día, no un instante: se
+   * imprimía como `17/08/2026 00:00:00` y esos ceros no informan de nada.
+   * La de autorización sí lleva hora, porque ahí el momento exacto importa.
+   */
+  private formatFechaSolo(fecha: string | null | undefined): string {
+    return this.formatFecha(fecha).split(' ')[0] ?? '';
+  }
+
   private formatFecha(fecha: string | null | undefined): string {
     if (!fecha) return '';
     try {

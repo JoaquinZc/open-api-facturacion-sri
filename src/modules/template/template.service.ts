@@ -31,7 +31,8 @@ export class TemplateService {
   /**
    * Get templates directory from STORAGE_PATHS
    */
-  private get templatesDir(): string {
+  /** Lo lee `RideService` para localizar los logos, que viven junto a las plantillas. */
+  get templatesDir(): string {
     return STORAGE_PATHS.templates;
   }
 

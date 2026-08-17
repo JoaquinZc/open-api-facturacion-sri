@@ -2,230 +2,385 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<!--
+  RIDE — Representación Impresa del Documento Electrónico.
+
+  ┌───────────────────────────────────────────────────────────────────────────┐
+  │ 🔴 TODO EL MAQUETADO VA EN TABLAS. NO USES flex NI grid.                   │
+  │                                                                           │
+  │ Carbone convierte este HTML a PDF con LibreOffice, que ignora `display:    │
+  │ flex` y `grid`. La versión anterior los usaba y el resultado era que los   │
+  │ datos del comprador se imprimían **encima** de la cabecera de la tabla de  │
+  │ detalles: cada bloque caía donde quería.                                   │
+  │                                                                           │
+  │ Tampoco: `position`, `float` complejos, `border-radius`, `box-shadow`,     │
+  │ `gap`, ni unidades relativas al viewport. Sí funcionan: tablas, anchos en  │
+  │ %, `border`, `padding`, `background-color`, tamaños en pt y `text-align`.  │
+  └───────────────────────────────────────────────────────────────────────────┘
+
+  La disposición sigue la del RIDE que se reconoce en Ecuador: a la izquierda el
+  emisor con su logo, a la derecha el recuadro del documento con RUC, número,
+  autorización, ambiente y la clave de acceso con su código. Cambiarla por algo
+  más «bonito» pero distinto obliga a quien recibe cientos de facturas a buscar
+  cada dato en un sitio nuevo.
+-->
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #1a1a1a; }
-  .ride-container { width: 100%; max-width: 800px; margin: 0 auto; }
+  * { margin: 0; padding: 0; }
 
-  /* Header */
-  .header { display: flex; justify-content: space-between; border: 2px solid #1a3a5c; padding: 10px; margin-bottom: 4px; background: #f8f9fa; }
-  .header-left { width: 58%; }
-  .header-right { width: 40%; text-align: right; border-left: 1px solid #ccc; padding-left: 8px; }
-  .emisor-name { font-size: 13px; font-weight: bold; color: #1a3a5c; margin-bottom: 3px; text-transform: uppercase; }
-  .emisor-info { font-size: 8px; line-height: 1.5; color: #444; }
-  .emisor-info strong { color: #1a3a5c; }
-  .ride-title { font-size: 14px; font-weight: bold; color: #1a3a5c; text-align: center; margin-bottom: 2px; letter-spacing: 2px; }
-  .doc-type { font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 4px; text-transform: uppercase; color: #333; }
-  .doc-info { font-size: 8px; text-align: right; line-height: 1.6; color: #333; }
-  .doc-info strong { color: #1a3a5c; }
-  .ambiente-badge { display: inline-block; padding: 2px 8px; font-size: 7px; font-weight: bold; border: 1px solid #1a3a5c; border-radius: 3px; color: #1a3a5c; margin-top: 2px; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 7.5pt;
+    color: #111;
+    line-height: 1.35;
+  }
 
-  /* Sections */
-  .section { border: 1px solid #ccc; margin-bottom: 4px; }
-  .section-title { font-size: 8px; font-weight: bold; background: #1a3a5c; color: #fff; padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .section-body { padding: 6px 8px; }
-  .info-grid { display: flex; flex-wrap: wrap; }
-  .info-item { width: 50%; font-size: 8px; line-height: 1.8; padding-right: 5px; }
-  .info-item.full { width: 100%; }
-  .info-label { font-weight: bold; color: #1a3a5c; }
+  /* El ancho de A4 menos márgenes. Fijo: LibreOffice no escala como un navegador. */
+  .ride { width: 100%; }
 
-  /* Details table */
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #1a3a5c; color: #fff; padding: 4px 3px; font-size: 7px; font-weight: bold; text-align: center; text-transform: uppercase; border: 1px solid #1a3a5c; }
-  td { border: 1px solid #ddd; padding: 3px; font-size: 8px; }
-  .detalles-table td { vertical-align: top; }
-  .text-right { text-align: right; }
-  .text-center { text-align: center; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { vertical-align: top; }
 
-  /* Impuestos within detail */
-  .imp-detalle { font-size: 7px; color: #666; margin-top: 2px; line-height: 1.3; }
-  .imp-detalle span { display: inline-block; margin-right: 6px; }
+  /* ─── Tipografía y utilidades ─────────────────────────────────────────── */
+  .r { text-align: right; }
+  .c { text-align: center; }
+  .b { font-weight: bold; }
+  .mono { font-family: 'Courier New', Courier, monospace; }
+  .lbl { color: #555; }
+  .xs { font-size: 6.5pt; }
+  .sm { font-size: 7pt; }
 
-  /* Totals */
-  .totals-wrapper { display: flex; justify-content: space-between; margin-top: 4px; gap: 4px; }
-  .payments-box { width: 48%; border: 1px solid #ccc; }
-  .totals-box { width: 48%; }
-  .totals-table th { font-size: 7px; padding: 3px; }
-  .totals-table td { font-size: 8px; padding: 2px 5px; }
-  .totals-table .total-row { font-weight: bold; font-size: 10px; border-top: 2px solid #1a3a5c; background: #f0f4f8; }
-  .totals-table .total-row td { padding: 4px 5px; }
+  /* ─── Cabecera ────────────────────────────────────────────────────────── */
+  .emisor-box, .doc-box {
+    border: 0.6pt solid #333;
+    padding: 7pt 9pt;
+  }
+  .emisor-box { border-right: none; }
 
-  /* Info adicional */
-  .info-adicional { font-size: 8px; line-height: 1.6; }
-  .info-adicional-item { display: block; padding: 1px 0; }
-  .info-adicional-item strong { color: #1a3a5c; }
+  .logo { max-height: 46pt; max-width: 150pt; margin-bottom: 5pt; }
 
-  /* Footer */
-  .footer { margin-top: 6px; text-align: center; font-size: 7px; line-height: 1.6; color: #333; }
-  .footer-box { border: 1px solid #ccc; padding: 6px; margin: 0 auto; max-width: 500px; }
-  .clave-acceso-label { font-weight: bold; color: #1a3a5c; font-size: 8px; }
-  .clave-acceso-num { font-size: 9px; font-family: 'Courier New', monospace; letter-spacing: 1px; word-break: break-all; margin: 3px 0; }
-  .footer-line { margin: 2px 0; }
-  .estado-badge { display: inline-block; padding: 2px 10px; font-weight: bold; font-size: 8px; border: 1px solid; border-radius: 3px; }
-  .estado-AUTORIZADO { color: #1a8a3a; border-color: #1a8a3a; background: #e8f5e9; }
-  .estado-DEVUELTA { color: #c62828; border-color: #c62828; background: #ffebee; }
-  .estado-PENDIENTE { color: #f57f17; border-color: #f57f17; background: #fff8e1; }
-  .estado-RECHAZADO { color: #c62828; border-color: #c62828; background: #ffebee; }
+  .emisor-nombre {
+    font-size: 11pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    line-height: 1.2;
+    margin-bottom: 1pt;
+  }
+  .emisor-comercial {
+    font-size: 8pt;
+    color: #444;
+    margin-bottom: 5pt;
+  }
+  .emisor-dato { margin-bottom: 1.5pt; }
 
-  .qr-placeholder { margin-top: 5px; font-size: 7px; color: #999; }
+  /* El recuadro del documento: lo primero que busca quien recibe la factura. */
+  .doc-tipo {
+    font-size: 12pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1pt;
+    border-bottom: 0.6pt solid #333;
+    padding-bottom: 4pt;
+    margin-bottom: 5pt;
+  }
+  .doc-numero {
+    font-size: 11pt;
+    font-weight: bold;
+    font-family: 'Courier New', Courier, monospace;
+    margin-bottom: 5pt;
+  }
+  .doc-fila { margin-bottom: 1.5pt; }
+
+  /* ─── Clave de acceso ─────────────────────────────────────────────────── */
+  .clave-box {
+    border: 0.6pt solid #333;
+    border-top: none;
+    padding: 6pt 9pt;
+  }
+  .clave-titulo {
+    font-size: 6.5pt;
+    font-weight: bold;
+    letter-spacing: 0.6pt;
+    color: #555;
+    margin-bottom: 2pt;
+  }
+  /*
+    Los 49 dígitos, en grupos. **La agrupación no es decorativa**: es la única
+    forma de que una persona pueda dictarlos por teléfono o teclearlos en
+    sri.gob.ec sin perder la cuenta, que es exactamente para lo que existen.
+  */
+  .clave-digitos {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 8.5pt;
+    letter-spacing: 0.4pt;
+    word-break: break-all;
+  }
+  .qr { width: 72pt; height: 72pt; }
+
+  /* ─── Secciones ───────────────────────────────────────────────────────── */
+  .sec-titulo {
+    font-size: 6.5pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.8pt;
+    background: #f0f0f0;
+    border: 0.6pt solid #333;
+    border-bottom: none;
+    padding: 3pt 9pt;
+    color: #222;
+  }
+  .sec-cuerpo {
+    border: 0.6pt solid #333;
+    padding: 6pt 9pt;
+  }
+
+  /* ─── Detalle ─────────────────────────────────────────────────────────── */
+  .detalle th {
+    background: #333;
+    color: #fff;
+    font-size: 6.5pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+    padding: 4pt 5pt;
+    border: 0.6pt solid #333;
+  }
+  .detalle td {
+    border: 0.5pt solid #bbb;
+    padding: 4pt 5pt;
+  }
+  .detalle .desc-nombre { font-weight: bold; }
+  .detalle .desc-imp {
+    font-size: 6.5pt;
+    color: #666;
+    margin-top: 1.5pt;
+  }
+
+  /* ─── Totales ─────────────────────────────────────────────────────────── */
+  .totales td {
+    border: 0.5pt solid #bbb;
+    padding: 3pt 6pt;
+  }
+  .totales .fila-total td {
+    border-top: 1.2pt solid #333;
+    background: #f0f0f0;
+    font-size: 10pt;
+    font-weight: bold;
+    padding: 5pt 6pt;
+  }
+
+  /* ─── Pie ─────────────────────────────────────────────────────────────── */
+  .estado {
+    display: inline-block;
+    padding: 2pt 10pt;
+    font-weight: bold;
+    font-size: 8pt;
+    border: 0.8pt solid #333;
+  }
+  .estado-AUTORIZADO { color: #14622e; border-color: #14622e; background: #eaf6ee; }
+  .estado-RECHAZADO,
+  .estado-DEVUELTA   { color: #a11; border-color: #a11; background: #fdecec; }
+  .estado-PENDIENTE  { color: #8a5a00; border-color: #8a5a00; background: #fff6e5; }
+
+  .aviso-pruebas {
+    border: 0.8pt solid #8a5a00;
+    background: #fff6e5;
+    color: #8a5a00;
+    font-weight: bold;
+    text-align: center;
+    padding: 4pt;
+    margin-bottom: 5pt;
+    font-size: 7.5pt;
+    letter-spacing: 0.5pt;
+  }
+
+  .pie {
+    margin-top: 7pt;
+    font-size: 6.5pt;
+    color: #666;
+    text-align: center;
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body>
-<div class="ride-container">
+<div class="ride">
 
-  <!-- HEADER: Emisor + Documento -->
-  <div class="header">
-    <div class="header-left">
-      <div class="emisor-name">{d.razonSocialEmisor}</div>
-      <div class="emisor-info">
-        <strong>RUC:</strong> {d.rucEmisor}<br>
-        {d.direccionMatriz}<br>
-        {d.nombreComercial}<br>
-        <strong>OBLIGADO A LLEVAR CONTABILIDAD:</strong> {d.obligadoContabilidad}
-        {d.contribuyenteEspecial}<br>
-        {d.contribuyenteRimpe}{d.agenteRetencion}
-      </div>
-    </div>
-    <div class="header-right">
-      <div class="ride-title">RIDE</div>
-      <div class="doc-type">{d.tipoComprobanteDescripcion}</div>
-      <div class="doc-info">
-        <strong>No.:</strong> {d.numeroComprobante}<br>
-        <strong>Fecha Emisi&oacute;n:</strong> {d.fechaEmisionFormato}<br>
-        <span class="ambiente-badge">AMBIENTE: {d.ambienteDescripcion}</span><br>
-        <strong>EMISI&Oacute;N:</strong> {d.tipoEmisionDescripcion}
-      </div>
-    </div>
-  </div>
+  <!--
+    🔴 **Ni un condicional de Carbone en esta plantilla, a propósito.**
 
-  <!-- COMPRADOR -->
-  <div class="section">
-    <div class="section-title">Informaci&oacute;n del Comprador</div>
-    <div class="section-body">
-      <div class="info-grid">
-        <div class="info-item"><span class="info-label">Raz&oacute;n Social:</span> {d.razonSocialComprador}</div>
-        <div class="info-item"><span class="info-label">Identificaci&oacute;n:</span> {d.identificacionComprador}</div>
-        <div class="info-item"><span class="info-label">Tipo Identif.:</span> {d.tipoIdentificacionComprador}</div>
-        <div class="info-item"><span class="info-label">Tel&eacute;fono:</span> {d.receptorTelefono}</div>
-        <div class="info-item full"><span class="info-label">Direcci&oacute;n:</span> {d.receptorDireccion}</div>
-        <div class="info-item full"><span class="info-label">Email:</span> {d.receptorEmail}</div>
-      </div>
-    </div>
-  </div>
+    `ifEmpty`, `showBegin`/`hideEnd` y compañía existen, pero un error de
+    sintaxis no falla: **imprime el marcador tal cual en el PDF**, y ese PDF es
+    un documento fiscal que se le entrega a un cliente. Como aquí no se puede
+    probar el render, todo lo condicional lo resuelve `ride.service.ts`, que sí
+    es código normal: manda cadenas ya compuestas, vacías cuando no aplican.
 
-  <!-- DETALLES -->
-  <table class="detalles-table">
+    Por eso verás campos como `emisorLeyendas` o `avisoAmbiente` en vez de
+    lógica en el HTML.
+  -->
+
+  <!-- ═══ CABECERA: emisor | documento ═══════════════════════════════════ -->
+  <table>
+    <tr>
+      <td class="emisor-box" style="width: 52%">
+        <!--
+          El logo siempre trae un valor: si el emisor no tiene, el servicio
+          manda un píxel transparente. Así no hay que preguntar en la plantilla
+          y tampoco queda un hueco de imagen rota.
+        -->
+        <img class="logo" src="{d.logoDataUri}">
+        <div class="emisor-nombre">{d.razonSocialEmisor}</div>
+        <div class="emisor-comercial">{d.nombreComercial}</div>
+
+        <div class="emisor-dato"><span class="lbl">R.U.C.:</span> <span class="b mono">{d.rucEmisor}</span></div>
+        <div class="emisor-dato"><span class="lbl">Matriz:</span> {d.direccionMatriz}</div>
+        <div class="emisor-dato"><span class="lbl">Establecimiento:</span> {d.direccionEstablecimiento}</div>
+        <div class="emisor-dato xs"><span class="lbl">Obligado a llevar contabilidad:</span> <span class="b">{d.obligadoContabilidad}</span></div>
+        <div class="emisor-dato xs b">{d.emisorLeyendas}</div>
+      </td>
+
+      <td class="doc-box" style="width: 48%">
+        <div class="doc-tipo">{d.tipoComprobanteDescripcion}</div>
+        <div class="doc-numero">N&ordm; {d.numeroComprobante}</div>
+
+        <div class="doc-fila"><span class="lbl">Fecha de emisi&oacute;n:</span> <span class="b">{d.fechaEmisionFormato}</span></div>
+        <!--
+          En pruebas, `ambienteDescripcion` ya viene con la advertencia
+          incorporada desde el servicio: entregar una factura de pruebas
+          creyendo que es real es un problema serio, y esto lo dice donde se
+          mira el número.
+        -->
+        <div class="doc-fila"><span class="lbl">Ambiente:</span> <span class="b">{d.ambienteDescripcion}</span></div>
+        <div class="doc-fila"><span class="lbl">Emisi&oacute;n:</span> <span class="b">{d.tipoEmisionDescripcion}</span></div>
+        <div class="doc-fila"><span class="lbl">N&ordm; de autorizaci&oacute;n:</span></div>
+        <div class="doc-fila mono xs" style="word-break: break-all">{d.numAutorizacion}</div>
+        <div class="doc-fila"><span class="lbl">Fecha de autorizaci&oacute;n:</span> <span class="b">{d.fechaAutorizacionFormato}</span></div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- ═══ CLAVE DE ACCESO ════════════════════════════════════════════════
+       Va a lo ancho y no dentro del recuadro: son 49 dígitos y encajonarlos
+       obligaba a partirlos en cuatro líneas ilegibles. -->
+  <table class="clave-box">
+    <tr>
+      <td style="padding-right: 10pt">
+        <div class="clave-titulo">CLAVE DE ACCESO</div>
+        <div class="clave-digitos">{d.claveAccesoAgrupada}</div>
+      </td>
+      <td style="width: 78pt" class="c">
+        <img class="qr" src="{d.qrDataUri}">
+      </td>
+    </tr>
+  </table>
+
+  <!-- ═══ COMPRADOR ══════════════════════════════════════════════════════ -->
+  <div class="sec-titulo" style="margin-top: 5pt">Informaci&oacute;n del comprador</div>
+  <table class="sec-cuerpo">
+    <tr>
+      <td style="width: 62%"><span class="lbl">Raz&oacute;n social / Nombres:</span> <span class="b">{d.razonSocialComprador}</span></td>
+      <td><span class="lbl">{d.tipoIdentificacionComprador}:</span> <span class="b mono">{d.identificacionComprador}</span></td>
+    </tr>
+    <tr>
+      <td style="padding-top: 2pt"><span class="lbl">Direcci&oacute;n:</span> {d.receptorDireccion}</td>
+      <td style="padding-top: 2pt"><span class="lbl">Tel&eacute;fono:</span> {d.receptorTelefono}</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding-top: 2pt"><span class="lbl">Correo:</span> {d.receptorEmail}</td>
+    </tr>
+  </table>
+
+  <!-- ═══ DETALLE ════════════════════════════════════════════════════════ -->
+  <table class="detalle" style="margin-top: 5pt">
     <thead>
       <tr>
-        <th style="width: 8%">C&oacute;digo</th>
-        <th style="width: 8%">Cant.</th>
-        <th style="width: 30%">Descripci&oacute;n</th>
-        <th style="width: 10%">P. Unit.</th>
-        <th style="width: 8%">Desc.</th>
-        <th style="width: 10%">Subtotal</th>
+        <th style="width: 9%">C&oacute;digo</th>
+        <th style="width: 8%" class="c">Cant.</th>
+        <th>Descripci&oacute;n</th>
+        <th style="width: 13%" class="r">P. unitario</th>
+        <th style="width: 11%" class="r">Descuento</th>
+        <th style="width: 14%" class="r">Subtotal</th>
       </tr>
     </thead>
     <tbody>
       {d.detalles[i]}
       <tr>
-        <td>{d.detalles[i].codigoPrincipal}</td>
-        <td class="text-center">{d.detalles[i].cantidadFormato}</td>
+        <td class="mono xs">{d.detalles[i].codigoPrincipal}</td>
+        <td class="c">{d.detalles[i].cantidadFormato}</td>
         <td>
-          {d.detalles[i].descripcion}
-          <div class="imp-detalle">
+          <div class="desc-nombre">{d.detalles[i].descripcion}</div>
+          <div class="desc-imp">
             {d.detalles[i].impuestos[n]}
-            <span>IMP: {d.detalles[i].impuestos[n].codigo} - {d.detalles[i].impuestos[n].tarifa}% | Base: {d.detalles[i].impuestos[n].baseImponibleFormato} | Valor: {d.detalles[i].impuestos[n].valorFormato}</span>
+            IVA {d.detalles[i].impuestos[n].tarifa}% &middot; base {d.detalles[i].impuestos[n].baseImponibleFormato} &middot; impuesto {d.detalles[i].impuestos[n].valorFormato}
             {d.detalles[i].impuestos[n+1]}
           </div>
         </td>
-        <td class="text-right">{d.detalles[i].precioUnitarioFormato}</td>
-        <td class="text-right">{d.detalles[i].descuentoFormato}</td>
-        <td class="text-right">{d.detalles[i].subtotalFormato}</td>
+        <td class="r mono">{d.detalles[i].precioUnitarioFormato}</td>
+        <td class="r mono">{d.detalles[i].descuentoFormato}</td>
+        <td class="r mono b">{d.detalles[i].subtotalFormato}</td>
       </tr>
       {d.detalles[i+1]}
     </tbody>
   </table>
 
-  <!-- TOTALES Y PAGOS -->
-  <div class="totals-wrapper">
-    <!-- Pagos -->
-    <div class="payments-box">
-      <div class="section-title">Forma de Pago</div>
-      <table>
-        <thead>
-          <tr>
-            <th>Descripci&oacute;n</th>
-            <th style="width: 25%">Total</th>
-          </tr>
-        </thead>
-        <tbody>
+  <!-- ═══ PAGOS + TOTALES ════════════════════════════════════════════════
+       Dos columnas con una tabla exterior. Aquí es donde el flexbox de la
+       versión anterior descolocaba los importes. -->
+  <table style="margin-top: 5pt">
+    <tr>
+      <td style="width: 52%; padding-right: 5pt">
+        <div class="sec-titulo">Forma de pago</div>
+        <table class="totales">
           {d.pagos[i]}
           <tr>
             <td>{d.pagos[i].formaPagoDescripcion}</td>
-            <td class="text-right">{d.pagos[i].totalFormato}</td>
+            <td class="r mono" style="width: 30%">{d.pagos[i].totalFormato}</td>
           </tr>
           {d.pagos[i+1]}
-        </tbody>
-      </table>
-    </div>
+        </table>
 
-    <!-- Totales -->
-    <div class="totals-box">
-      <table class="totals-table">
-        <thead>
+        <div class="sec-titulo" style="margin-top: 5pt">Informaci&oacute;n adicional</div>
+        <table class="totales">
+          {d.infoAdicional[i]}
           <tr>
-            <th>Descripci&oacute;n</th>
-            <th style="width: 30%">Valor</th>
+            <td class="lbl" style="width: 42%">{d.infoAdicional[i].nombre}</td>
+            <td>{d.infoAdicional[i].valor}</td>
           </tr>
-        </thead>
-        <tbody>
+          {d.infoAdicional[i+1]}
+        </table>
+      </td>
+
+      <td style="width: 48%">
+        <table class="totales">
           <tr>
-            <td>SUBTOTAL SIN IMPUESTOS</td>
-            <td class="text-right">{d.subtotalFormato}</td>
+            <td>Subtotal sin impuestos</td>
+            <td class="r mono" style="width: 38%">{d.subtotalFormato}</td>
           </tr>
           <tr>
-            <td>TOTAL DESCUENTO</td>
-            <td class="text-right">{d.totalDescuentoFormato}</td>
+            <td>Total descuento</td>
+            <td class="r mono">{d.totalDescuentoFormato}</td>
           </tr>
           {d.totales[i]}
           <tr>
-            <td>{d.totales[i].descripcion} {d.totales[i].tarifa}% (Base: {d.totales[i].baseImponibleFormato})</td>
-            <td class="text-right">{d.totales[i].valorFormato}</td>
+            <td>{d.totales[i].descripcion} {d.totales[i].tarifa}%<span class="xs lbl"> (base {d.totales[i].baseImponibleFormato})</span></td>
+            <td class="r mono">{d.totales[i].valorFormato}</td>
           </tr>
           {d.totales[i+1]}
-          <tr class="total-row">
-            <td>IMPORTE TOTAL</td>
-            <td class="text-right">{d.totalFormato}</td>
+          <tr class="fila-total">
+            <td>VALOR TOTAL</td>
+            <td class="r mono">{d.totalFormato}</td>
           </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+        </table>
+      </td>
+    </tr>
+  </table>
 
-  <!-- INFO ADICIONAL -->
-  <div class="section">
-    <div class="section-title">Informaci&oacute;n Adicional</div>
-    <div class="section-body">
-      <div class="info-adicional">
-        {d.infoAdicional[i]}
-        <span class="info-adicional-item"><strong>{d.infoAdicional[i].nombre}:</strong> {d.infoAdicional[i].valor}</span>
-        {d.infoAdicional[i+1]}
-      </div>
+  <!-- ═══ PIE ════════════════════════════════════════════════════════════ -->
+  <div class="pie">
+    <div style="margin-bottom: 4pt">
+      <span class="estado estado-{d.estado}">{d.estado}</span>
     </div>
-  </div>
-
-  <!-- FOOTER -->
-  <div class="footer">
-    <div class="footer-box">
-      <div class="clave-acceso-label">CLAVE DE ACCESO</div>
-      <div class="clave-acceso-num">{d.claveAcceso}</div>
-      <div class="footer-line"><strong>N&Uacute;MERO DE AUTORIZACI&Oacute;N:</strong> {d.numAutorizacion}</div>
-      <div class="footer-line"><strong>FECHA Y HORA DE AUTORIZACI&Oacute;N:</strong> {d.fechaAutorizacionFormato}</div>
-      <div class="footer-line" style="margin-top: 4px;">
-        ESTADO: <span class="estado-badge estado-{d.estado}">{d.estado}</span>
-      </div>
-    </div>
-    <div class="qr-placeholder">[QR de verificaci&oacute;n - Consulte en www.sri.gob.ec]</div>
+    Verifique este comprobante con su clave de acceso en <b>www.sri.gob.ec</b>
+    &nbsp;&middot;&nbsp; Documento generado electr&oacute;nicamente
   </div>
 
 </div>
