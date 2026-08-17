@@ -29,6 +29,7 @@ export class EmisoresService {
     contribuyente_rimpe, ambiente, estado, tenant_id,
     certificado_p12 IS NOT NULL as tiene_certificado,
     certificado_valido_hasta, certificado_sujeto,
+    eslogan, ciudad, email, web, telefono, logo_url,
     created_at, updated_at
   `;
 
@@ -299,8 +300,9 @@ export class EmisoresService {
       `INSERT INTO emisores (
         ruc, razon_social, nombre_comercial, direccion_matriz,
         obligado_contabilidad, contribuyente_especial, agente_retencion,
-        contribuyente_rimpe, ambiente, estado, tenant_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        contribuyente_rimpe, ambiente, estado, tenant_id,
+        eslogan, ciudad, email, web, telefono, logo_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING id`,
       [
         dto.ruc,
@@ -314,6 +316,12 @@ export class EmisoresService {
         this.toAmbienteCodigo(dto.ambiente),
         EmisorEstado.ACTIVO,
         dto.tenantId || null,
+        dto.eslogan || null,
+        dto.ciudad || null,
+        dto.email || null,
+        dto.web || null,
+        dto.telefono || null,
+        dto.logoUrl || null,
       ],
     );
 
@@ -365,6 +373,27 @@ export class EmisoresService {
       updates.push(`estado = $${paramIndex++}`);
       // El estado ya viene validado por @IsEnum en el DTO
       values.push(this.toEstadoNormalizado(dto.estado));
+    }
+
+    /*
+     * Datos de marca. La cadena vacía se guarda como `NULL` a propósito: es lo
+     * que manda el formulario cuando se borra un campo, y guardarla tal cual
+     * dejaría el pie del RIDE con un separador suelto sin nada al lado.
+     */
+    const marca: Array<[keyof UpdateEmisorDto, string]> = [
+      ['eslogan', 'eslogan'],
+      ['ciudad', 'ciudad'],
+      ['email', 'email'],
+      ['web', 'web'],
+      ['telefono', 'telefono'],
+      ['logoUrl', 'logo_url'],
+    ];
+
+    for (const [campo, columna] of marca) {
+      if (dto[campo] !== undefined) {
+        updates.push(`${columna} = $${paramIndex++}`);
+        values.push((dto[campo] as string) || null);
+      }
     }
 
     if (updates.length === 0) {
@@ -517,6 +546,12 @@ export class EmisoresService {
       tieneCertificado: row.tiene_certificado as boolean,
       certificadoValidoHasta: (row.certificado_valido_hasta as Date)?.toISOString(),
       certificadoSujeto: row.certificado_sujeto as string | undefined,
+      eslogan: (row.eslogan as string) ?? undefined,
+      ciudad: (row.ciudad as string) ?? undefined,
+      email: (row.email as string) ?? undefined,
+      web: (row.web as string) ?? undefined,
+      telefono: (row.telefono as string) ?? undefined,
+      logoUrl: (row.logo_url as string) ?? undefined,
       createdAt: (row.created_at as Date)?.toISOString(),
       updatedAt: (row.updated_at as Date)?.toISOString(),
     };

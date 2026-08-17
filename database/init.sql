@@ -450,7 +450,13 @@ CREATE TABLE public.emisores (
     certificado_password_encrypted text,
     certificado_valido_hasta timestamp with time zone,
     certificado_sujeto text,
-    certificado_updated_at timestamp with time zone
+    certificado_updated_at timestamp with time zone,
+    eslogan character varying(160),
+    ciudad character varying(120),
+    email character varying(255),
+    web character varying(255),
+    telefono character varying(40),
+    logo_url character varying(500)
 );
 
 
@@ -459,6 +465,20 @@ CREATE TABLE public.emisores (
 --
 
 COMMENT ON TABLE public.emisores IS 'Empresas emisoras de comprobantes electrónicos';
+
+
+--
+-- Name: COLUMN emisores.eslogan; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.emisores.eslogan IS 'Datos de marca del RIDE: no son fiscales y el SRI los ignora. Solo se imprimen en el PDF (cabecera y pie de ride.docx).';
+
+
+--
+-- Name: COLUMN emisores.logo_url; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.emisores.logo_url IS 'URL pública del logo. RideService la descarga y la cachea; si falla, cae al PNG de templates/logos/{ruc}.png y luego a un píxel transparente.';
 
 
 --

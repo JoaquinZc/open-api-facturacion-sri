@@ -5,6 +5,7 @@ import FormData from 'form-data';
 import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
 import { PdfImageService } from './pdf-image.service';
+import { inyectarImagenesEnDocx } from './docx-imagenes';
 
 export interface ImageData {
   url: string;
@@ -45,12 +46,39 @@ export class PdfService {
   async generatePDF(
     jsonData: Record<string, unknown>,
     templatePath: string,
+    /**
+     * Imágenes que se meten en la plantilla **antes** de subirla, localizadas
+     * por su texto alternativo: `{ '{d.emisor.logo}': <bytes> }`.
+     *
+     * Se hace aquí y no con el mecanismo de imágenes de Carbone porque **se
+     * comprobó que la edición desplegada no lo aplica**: sustituye el texto
+     * alternativo por el Data URI y deja el binario intacto, así que el PDF
+     * sale con la imagen de relleno de la plantilla. Ver `docx-imagenes.ts`.
+     */
+    imagenes?: Record<string, Buffer>,
   ): Promise<Buffer> {
     // 1. Upload template to Carbone
     const formData = new FormData();
     // Buffer y no flujo: es lo que permite calcular `Content-Length` (ver abajo).
-    const templateBuffer = readFileSync(templatePath);
+    // El tipo va explícito: `readFileSync` devuelve un `Buffer<ArrayBuffer>` y
+    // JSZip uno `<ArrayBufferLike>`, que no encajan sin ensancharlo aquí.
+    let templateBuffer: Buffer = readFileSync(templatePath);
     const ext = extname(templatePath).toLowerCase();
+
+    if (imagenes && Object.keys(imagenes).length > 0) {
+      const r = await inyectarImagenesEnDocx(templateBuffer, imagenes);
+      templateBuffer = r.docx;
+
+      if (r.noEncontradas.length > 0) {
+        // No se detiene el render: un documento sin logo sigue siendo válido.
+        // Pero conviene saberlo, porque el síntoma en el PDF es una imagen de
+        // relleno que *parece* correcta.
+        this.logger.warn(
+          `No se pudieron colocar estas imágenes en ${basename(templatePath)}: ` +
+            `${r.noEncontradas.join(', ')}. El PDF saldrá con el relleno de la plantilla.`,
+        );
+      }
+    }
     const contentTypes: Record<string, string> = {
       '.docx':
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

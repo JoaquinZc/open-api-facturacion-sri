@@ -175,6 +175,55 @@ async function seedAdmin(client: Client): Promise<void> {
   log(`✅ superadmin ${email} creado.`);
 }
 
+/**
+ * Cambios de esquema **posteriores** a `init.sql`.
+ *
+ * 🔴 `init.sql` se aplica **una sola vez en la vida de la base**. En cuanto
+ * queda la marca no se vuelve a mirar, así que una columna añadida allí llega
+ * únicamente a las instalaciones nuevas: la que está en producción no la ve
+ * nunca. Ese es exactamente el fallo que se descubre cuando el despliegue va
+ * bien y luego revienta una consulta por una columna que «ya está en el SQL».
+ *
+ * Por eso esto corre **en cada arranque** y es aditivo e idempotente: solo
+ * `ADD COLUMN IF NOT EXISTS`, nada que borre ni reescriba. No hace falta un
+ * framework de migraciones para un puñado de columnas, pero sí hace falta que
+ * alguien las aplique.
+ *
+ * **Reglas para añadir aquí:**
+ *   - Solo operaciones que se puedan repetir sin efecto (`IF NOT EXISTS`).
+ *   - Nunca `DROP` ni `ALTER TYPE`: eso necesita una ventana y un respaldo.
+ *   - Nunca una columna `NOT NULL` sin `DEFAULT`: bloquea el arranque contra
+ *     una tabla con filas.
+ */
+const ADDITIVE_MIGRATIONS: Array<{ nombre: string; sql: string }> = [
+  {
+    nombre: 'emisores: datos de marca para el RIDE',
+    sql: `
+      ALTER TABLE public.emisores
+        ADD COLUMN IF NOT EXISTS eslogan  character varying(160),
+        ADD COLUMN IF NOT EXISTS ciudad   character varying(120),
+        ADD COLUMN IF NOT EXISTS email    character varying(255),
+        ADD COLUMN IF NOT EXISTS web      character varying(255),
+        ADD COLUMN IF NOT EXISTS telefono character varying(40),
+        ADD COLUMN IF NOT EXISTS logo_url character varying(500)
+    `,
+  },
+];
+
+async function applyAdditiveMigrations(client: Client): Promise<void> {
+  for (const { nombre, sql } of ADDITIVE_MIGRATIONS) {
+    try {
+      await client.query(sql);
+      log(`· ${nombre}`);
+    } catch (error) {
+      // Se informa y se sigue: una migración aditiva que falla no debe impedir
+      // que arranque el servicio. Lo contrario deja la API caída por una
+      // columna opcional.
+      log(`⚠️  «${nombre}» falló: ${(error as Error).message}`);
+    }
+  }
+}
+
 async function run(): Promise<void> {
   if (process.env.DB_BOOTSTRAP_SKIP === 'true') {
     log('DB_BOOTSTRAP_SKIP=true → se omite el bootstrap.');
@@ -228,6 +277,11 @@ async function run(): Promise<void> {
 
       log('✅ esquema inicializado correctamente.');
     }
+
+    // Corre siempre, tanto si el esquema se acaba de crear como si ya estaba:
+    // es la única vía por la que un cambio de esquema llega a la base que ya
+    // está en producción.
+    await applyAdditiveMigrations(client);
 
     // Corre siempre: cubre el caso de una base con esquema pero sin superadmin.
     await seedAdmin(client);

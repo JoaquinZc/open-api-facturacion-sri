@@ -27,8 +27,37 @@ export class RideService {
    * poner condicionales en la plantilla — que es justo lo que no se quiere,
    * porque un condicional mal escrito en Carbone imprime el marcador en el PDF.
    */
-  private static readonly PIXEL_TRANSPARENTE =
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  /**
+   * PNG de 1×1 transparente.
+   *
+   * 🔴 **Es obligatorio, no un adorno.** Las imágenes se meten en la plantilla
+   * sustituyendo su relleno, y el relleno de `ride.docx` es el logo de
+   * Darkmelon y un código de barras decorativo. No sustituir cuando falta el
+   * dato **no deja el hueco vacío: deja el relleno**, y entonces la factura de
+   * un negocio saldría con el logo de Darkmelon y un código que no es su clave
+   * de acceso. Poner el píxel transparente es lo que borra el hueco.
+   */
+  private static readonly PIXEL_TRANSPARENTE = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    'base64',
+  );
+
+  /**
+   * Logos ya descargados, por URL. `null` significa «se intentó y no se pudo»,
+   * que también se recuerda: si el servidor del logo está caído, no tiene
+   * sentido esperar el tiempo de espera completo en cada RIDE que se pida.
+   */
+  private static readonly cacheDeLogos = new Map<string, Buffer | null>();
+
+  /** Un RIDE es una descarga interactiva: nadie espera cinco segundos por un logo. */
+  private static readonly LOGO_TIMEOUT_MS = 4000;
+
+  /**
+   * Tope del logo. El Data URI viaja dentro del cuerpo que se manda a Carbone,
+   * y en base64 engorda un tercio; 2 MB de logo son ya 2,7 MB de petición para
+   * una imagen que se imprime a 40 mm de ancho.
+   */
+  private static readonly LOGO_MAX_BYTES = 2 * 1024 * 1024;
 
   constructor(
     private readonly pdfService: PdfService,
@@ -68,8 +97,11 @@ export class RideService {
      */
     const clave = comprobante.clave_acceso as string;
     const qrDataUri = await this.generarQr(clave);
-    const barcodeDataUri = await this.generarBarcode(clave);
-    const logoDataUri = this.cargarLogo(comprobante.ruc_emisor as string);
+    const barcode = await this.generarBarcode(clave);
+    const logo = await this.cargarLogo(
+      comprobante.ruc_emisor as string,
+      comprobante.emisor_logo_url as string | null,
+    );
 
     const rideData = this.mapComprobanteToRideData(
       comprobante,
@@ -78,17 +110,34 @@ export class RideService {
       impuestos,
       pagos,
       infoAdicional,
-      { qrDataUri, barcodeDataUri, logoDataUri },
+      { qrDataUri },
     );
 
     const templatePath = this.templateService.findTemplate(
       RideService.RIDE_TEMPLATE_ID,
     );
 
-    return this.pdfService.generatePDF(
-      rideData as AnyRecord,
-      templatePath,
-    );
+    /*
+     * ═══ Las imágenes van por fuera de Carbone ════════════════════════════
+     *
+     * 🔴 **Se comprobó que la edición desplegada no sustituye imágenes.**
+     * Renderizando esta misma plantilla, Carbone cambia todas las etiquetas de
+     * texto —incluidas las del encabezado y el pie— pero escribe el Data URI
+     * en el atributo `descr` y **deja el binario intacto**. El PDF sale con la
+     * imagen de relleno del Word.
+     *
+     * Y el relleno de `ride.docx` es un **código de barras decorativo**. Un
+     * RIDE así parece correcto y no lo es: quien escanee ese código no obtiene
+     * la clave de acceso.
+     *
+     * Así que se meten aquí, en la plantilla, antes de subirla. La etiqueta del
+     * texto alternativo se sigue usando —es como se localiza cada hueco—, pero
+     * la sustitución la hace `docx-imagenes.ts`, que sí se puede verificar.
+     */
+    return this.pdfService.generatePDF(rideData as AnyRecord, templatePath, {
+      '{d.factura.claveAccesoBarcode}': barcode,
+      '{d.emisor.logo}': logo,
+    });
   }
 
   /**
@@ -115,11 +164,16 @@ export class RideService {
    * `generarBarcode()`. Este QR se mantiene disponible por si se quiere añadir
    * al lado —algunos RIDE llevan los dos— pero la plantilla no lo usa hoy.
    *
-   * Si falla, **no tumba el RIDE**: se devuelve un píxel transparente. Un
-   * comprobante sin QR sigue siendo válido; uno que no se genera, no existe.
+   * ⚠️ Si algún día se añade al Word, **no basta con poner la etiqueta**:
+   * hay que pasarlo por `generatePDF(..., imagenes)` como el logo y el código
+   * de barras, porque Carbone no sustituye imágenes en esta edición. Por eso
+   * este devuelve un Data URI y aquellos devuelven bytes.
+   *
+   * Si falla, **no tumba el RIDE**: devuelve cadena vacía. Un comprobante sin
+   * QR sigue siendo válido; uno que no se genera, no existe.
    */
   private async generarQr(claveAcceso: string): Promise<string> {
-    if (!claveAcceso) return RideService.PIXEL_TRANSPARENTE;
+    if (!claveAcceso) return '';
 
     try {
       return await QRCode.toDataURL(claveAcceso, {
@@ -131,7 +185,7 @@ export class RideService {
       this.logger.warn(
         `No se pudo generar el QR de ${claveAcceso}: ${(error as Error).message}`,
       );
-      return RideService.PIXEL_TRANSPARENTE;
+      return '';
     }
   }
 
@@ -152,7 +206,7 @@ export class RideService {
    * comprobante sin código de barras sigue siendo válido —los 49 dígitos
    * impresos son lo que exige la norma—; uno que no se genera, no existe.
    */
-  private async generarBarcode(claveAcceso: string): Promise<string> {
+  private async generarBarcode(claveAcceso: string): Promise<Buffer> {
     if (!claveAcceso) return RideService.PIXEL_TRANSPARENTE;
 
     try {
@@ -160,17 +214,31 @@ export class RideService {
         bcid: 'code128',
         text: claveAcceso,
         /*
-         * Bajo y ancho, como en cualquier RIDE: se lee con la pistola apoyada
-         * en el papel, no a distancia. Con 49 dígitos, Code 128 en modo
-         * numérico ronda los 90 mm de ancho, que caben de sobra en un A4.
+         * 🔴 **La zona muda no es un margen estético: sin ella no se lee.**
+         *
+         * `bwip-js` genera el PNG pegado al primer y al último módulo, y Code
+         * 128 exige diez módulos de blanco a cada lado (ISO/IEC 15417 §5.2).
+         * El lector los usa para saber dónde empieza el símbolo; sin ellos no
+         * encuentra el patrón de inicio y **no devuelve nada** —ni un dato
+         * equivocado, que al menos se notaría—. El código estaba perfectamente
+         * codificado y aun así ningún escáner lo veía.
+         *
+         * Se ponen doce y no diez para tener holgura frente al reescalado que
+         * hace LibreOffice al meterlo en el PDF.
          */
-        height: 12,
+        paddingwidth: 12,
+        /*
+         * Alto en milímetros. Se lee con la pistola apoyada en el papel, pero
+         * también con la cámara de un móvil desde la pantalla, y ahí un código
+         * bajo se pierde: 15 mm da margen para apuntar sin recortarlo.
+         */
+        height: 15,
         scale: 3,
         includetext: false,
         backgroundcolor: 'FFFFFF',
       });
 
-      return `data:image/png;base64,${png.toString('base64')}`;
+      return png;
     } catch (error) {
       this.logger.warn(
         `No se pudo generar el código de barras de ${claveAcceso}: ${(error as Error).message}`,
@@ -182,14 +250,31 @@ export class RideService {
   /**
    * El logo del emisor, si lo tiene.
    *
-   * Se busca por RUC en `{TEMPLATES_DIR}/logos/{ruc}.png`. Es deliberadamente
-   * simple: las plantillas ya viajan en la imagen, así que añadir un logo es
-   * dejar un fichero al lado, sin tocar la base de datos ni el despliegue.
+   * Se busca en tres sitios, en este orden:
    *
-   * Sin logo se devuelve un píxel transparente en vez de una cadena vacía: así
-   * la plantilla no necesita preguntar y no queda el hueco de una imagen rota.
+   *   1. **`emisores.logo_url`** — la imagen que el propio negocio ya subió a
+   *      su ficha. Es la que hace que esto funcione con muchos negocios: el
+   *      logo lo pone su dueño y llega solo.
+   *   2. **`{TEMPLATES_DIR}/logos/{ruc}.png`** — un fichero en la imagen del
+   *      contenedor. Sirve para emisores fijos, como Darkmelon, cuyo logo no
+   *      cambia y no merece un viaje de red en cada RIDE.
+   *   3. **Un píxel transparente.**
+   *
+   * 🔴 **El píxel transparente no es «no hacer nada».** El hueco del logo en
+   * `ride.docx` lleva de relleno el logo de Darkmelon; si no se sustituye, la
+   * factura de un negocio cualquiera sale con la marca de Darkmelon. El píxel
+   * es lo que borra el relleno.
+   *
+   * **Un logo que no se puede traer nunca tumba el RIDE.** Un comprobante sin
+   * logo sigue siendo un comprobante válido; uno que no se genera, no existe.
    */
-  private cargarLogo(rucEmisor: string): string {
+  private async cargarLogo(
+    rucEmisor: string,
+    logoUrl?: string | null,
+  ): Promise<Buffer> {
+    const remoto = await this.descargarLogo(logoUrl);
+    if (remoto) return remoto;
+
     if (!rucEmisor) return RideService.PIXEL_TRANSPARENTE;
 
     try {
@@ -201,10 +286,78 @@ export class RideService {
 
       if (!existsSync(ruta)) return RideService.PIXEL_TRANSPARENTE;
 
-      const png = readFileSync(ruta).toString('base64');
-      return `data:image/png;base64,${png}`;
+      return readFileSync(ruta);
     } catch {
       return RideService.PIXEL_TRANSPARENTE;
+    }
+  }
+
+  /**
+   * Descarga el logo de su URL y lo devuelve como Data URI.
+   *
+   * **Se cachea en memoria por URL.** Sin caché, cada descarga de un RIDE
+   * dispararía una petición a un servidor ajeno; con ella, el logo de un
+   * negocio se trae una vez por instancia y ya. La caché no se invalida sola:
+   * si alguien cambia el logo, se ve en el siguiente reinicio. Es el
+   * compromiso correcto para un dato que cambia una vez al año.
+   *
+   * Devuelve `null` —y no lanza— ante cualquier problema: URL inválida, host
+   * caído, tiempo agotado, respuesta que no es una imagen o demasiado grande.
+   */
+  private async descargarLogo(url?: string | null): Promise<Buffer | null> {
+    const limpia = url?.trim();
+    if (!limpia) return null;
+
+    const cacheado = RideService.cacheDeLogos.get(limpia);
+    if (cacheado !== undefined) return cacheado;
+
+    const resultado = await this.traerLogo(limpia);
+    RideService.cacheDeLogos.set(limpia, resultado);
+    return resultado;
+  }
+
+  private async traerLogo(url: string): Promise<Buffer | null> {
+    try {
+      // Solo HTTP(S). Sin esto, un `file://` en la ficha de un emisor sería un
+      // lector de ficheros del contenedor a través de una URL que escribe el
+      // dueño de un negocio.
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        this.logger.warn(`Logo con protocolo no admitido: ${parsed.protocol}`);
+        return null;
+      }
+
+      const respuesta = await fetch(url, {
+        signal: AbortSignal.timeout(RideService.LOGO_TIMEOUT_MS),
+        redirect: 'follow',
+      });
+
+      if (!respuesta.ok) {
+        this.logger.warn(`El logo ${url} respondió ${respuesta.status}`);
+        return null;
+      }
+
+      const tipo = respuesta.headers.get('content-type') ?? '';
+      if (!tipo.startsWith('image/')) {
+        this.logger.warn(`El logo ${url} no es una imagen (${tipo})`);
+        return null;
+      }
+
+      const bytes = Buffer.from(await respuesta.arrayBuffer());
+
+      if (bytes.byteLength > RideService.LOGO_MAX_BYTES) {
+        this.logger.warn(
+          `El logo ${url} pesa ${bytes.byteLength} bytes; el máximo son ${RideService.LOGO_MAX_BYTES}.`,
+        );
+        return null;
+      }
+
+      return bytes;
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo traer el logo ${url}: ${(error as Error).message}`,
+      );
+      return null;
     }
   }
 
@@ -222,11 +375,12 @@ export class RideService {
     pagos: any[],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     infoAdicional: any[],
-    extras: {
-      qrDataUri: string;
-      barcodeDataUri: string;
-      logoDataUri: string;
-    },
+    /**
+     * El logo y el código de barras **ya no viajan aquí**: se meten en la
+     * plantilla antes de subirla, porque Carbone no sustituye imágenes en la
+     * edición desplegada. Solo queda el QR, que la plantilla no usa.
+     */
+    extras: { qrDataUri: string },
   ): AnyRecord {
     const esProduccion = comprobante.ambiente === Ambiente.PRODUCCION;
 
@@ -339,18 +493,27 @@ export class RideService {
           comprobante.agente_retencion === 'true'
             ? 'AGENTE DE RETENCIÓN'
             : '',
-        logo: extras.logoDataUri,
         /*
-         * Estos cinco no existen en el comprobante: son datos de marca, no
-         * fiscales, y el SRI no los guarda. Se emiten vacíos para que la
-         * plantilla no imprima la etiqueta cruda. Si algún día hacen falta,
-         * el sitio es la ficha del emisor.
+         * Vacío a propósito: la imagen la coloca `docx-imagenes.ts` metiendo
+         * los bytes en la plantilla. Se deja la clave para que Carbone no
+         * imprima el marcador crudo si algún día la etiqueta sobrevive en el
+         * texto alternativo.
          */
-        eslogan: '',
-        ciudad: '',
-        email: '',
-        web: '',
-        telefono: '',
+        logo: '',
+        /*
+         * Datos de marca. **No están en el comprobante, están en el emisor**, y
+         * por eso los trae la consulta con alias `emisor_*`: el SRI no los
+         * guarda porque no son fiscales, pero el RIDE los imprime en la
+         * cabecera y el pie.
+         *
+         * Se emiten como cadena vacía cuando faltan —nunca `undefined`— para
+         * que la plantilla no acabe imprimiendo el marcador crudo.
+         */
+        eslogan: comprobante.emisor_eslogan || '',
+        ciudad: comprobante.emisor_ciudad || '',
+        email: comprobante.emisor_email || '',
+        web: comprobante.emisor_web || '',
+        telefono: comprobante.emisor_telefono || '',
       },
 
       factura: {
@@ -365,24 +528,24 @@ export class RideService {
         claveAcceso: comprobante.clave_acceso || '',
         claveAccesoAgrupada: this.agruparClave(comprobante.clave_acceso),
         /**
-         * El código que acompaña a la clave de acceso, como imagen embebida.
+         * El código que acompaña a la clave de acceso: Code 128 de los 49
+         * dígitos, que es lo que describe la ficha técnica.
          *
-         * Code 128 de los 49 dígitos, que es lo que describe la ficha técnica.
+         * **Se deja vacío aquí a propósito.** La imagen la mete
+         * `docx-imagenes.ts` en la plantilla antes de subirla. Dos mecanismos
+         * de Carbone se descartaron, y por motivos distintos:
          *
-         * 🔴 **No se usa `:barcode(code128)` de Carbone.** Es una función de la
-         * edición Enterprise, y el contenedor corre en Community:
-         *
-         *     Formatter "barcode" is disabled in the Community Edition
-         *
-         * La imagen se llama `carbone-ee`, pero sin licencia arranca en CE — así
-         * que no es cuestión de actualizar, ahí no va a existir nunca. Y el
-         * fallo **tumba el render completo con un 500**: no se pierde solo esa
-         * imagen, no sale ningún RIDE.
-         *
-         * Por eso viaja ya generada, por el mismo camino que el logo: un Data
-         * URI en el texto alternativo, que es mecanismo probado.
+         * 1. `:barcode(code128)` — **tumba el render entero con un 500**:
+         *    `Formatter "barcode" is disabled in the Community Edition`. La
+         *    imagen se llama `carbone-ee` pero sin licencia arranca en CE, así
+         *    que ahí no va a existir nunca.
+         * 2. La imagen por texto alternativo — **falla en silencio**: se
+         *    comprobó renderizando esta misma plantilla y Carbone escribe el
+         *    Data URI en el atributo `descr` sin tocar el binario. El PDF sale
+         *    con el código de barras decorativo del Word, que parece correcto
+         *    y no lleva la clave de acceso.
          */
-        claveAccesoBarcode: extras.barcodeDataUri,
+        claveAccesoBarcode: '',
         /** No se emiten guías de remisión desde aquí. */
         guiaRemision: '',
         /**
@@ -449,7 +612,8 @@ export class RideService {
       claveAcceso: comprobante.clave_acceso || '',
       claveAccesoAgrupada: this.agruparClave(comprobante.clave_acceso),
       qrDataUri: extras.qrDataUri,
-      logoDataUri: extras.logoDataUri,
+      /** Vacío: la imagen se mete en la plantilla, no viaja en los datos. */
+      logoDataUri: '',
       /**
        * Las menciones que solo aparecen si el emisor las tiene, ya resueltas en
        * una sola cadena. **La plantilla no decide**: un condicional mal escrito

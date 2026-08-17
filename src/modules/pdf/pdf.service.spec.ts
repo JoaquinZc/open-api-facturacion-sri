@@ -8,8 +8,19 @@ jest.mock('axios', () => ({
   get: jest.fn(),
 }));
 
+/*
+ * `readFileSync` no está por comodidad: **es lo que usa `generatePDF`**.
+ *
+ * La plantilla se lee a memoria a propósito, para poder mandar
+ * `Content-Length`; con un flujo, `form-data` no sabe el tamaño, axios manda
+ * la petición troceada y Carbone la acepta sin llegar a escribir el fichero,
+ * fallando después con un 415 que culpa al formato. Cuando el servicio cambió
+ * de flujo a búfer, este doble se quedó atrás y el módulo entero dejó de
+ * poder ejecutarse: `(0, fs_1.readFileSync) is not a function`.
+ */
 jest.mock('fs', () => ({
   createReadStream: jest.fn(() => ({ path: '/fake/templates/report.docx' })),
+  readFileSync: jest.fn(() => Buffer.from('plantilla de prueba')),
 }));
 
 jest.mock('path', () => ({

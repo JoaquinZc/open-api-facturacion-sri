@@ -3,6 +3,7 @@ import {
   IsOptional,
   IsBoolean,
   Length,
+  MaxLength,
   Matches,
   IsNotEmpty,
   IsEnum,
@@ -30,7 +31,8 @@ export enum EmisorEstado {
 
 export class QueryEmisoresDto {
   @ApiPropertyOptional({
-    description: 'Cursor (UUID) para paginación keyset (ID del último emisor de la página anterior)',
+    description:
+      'Cursor (UUID) para paginación keyset (ID del último emisor de la página anterior)',
   })
   @IsOptional()
   @IsUUID()
@@ -56,7 +58,9 @@ export class QueryEmisoresDto {
     default: 20,
   })
   @IsOptional()
-  @Transform(({ value }) => value !== undefined ? parseInt(String(value), 10) : 20)
+  @Transform(({ value }) =>
+    value !== undefined ? parseInt(String(value), 10) : 20,
+  )
   @IsInt()
   @Min(1)
   @Max(100)
@@ -122,6 +126,54 @@ export class CreateEmisorDto {
   @IsOptional()
   @IsString()
   tenantId?: string;
+
+  /* ─── Datos de marca del RIDE ─────────────────────────────────────────────
+   *
+   * **No son fiscales.** El SRI no los pide, no viajan en el XML firmado y no
+   * afectan a la autorización: solo se imprimen en el PDF, en la cabecera y el
+   * pie de `ride.docx`. Viven en el emisor —y no en cada comprobante— porque
+   * son de la empresa y no del documento: cambiar el teléfono no debería
+   * obligar a reemitir nada.
+   */
+
+  @ApiPropertyOptional({ description: 'Eslogan bajo el logo del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  eslogan?: string;
+
+  @ApiPropertyOptional({ description: 'Ciudad, para el pie del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  ciudad?: string;
+
+  @ApiPropertyOptional({ description: 'Email de contacto del pie del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Sitio web del pie del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  web?: string;
+
+  @ApiPropertyOptional({ description: 'Teléfono de contacto del pie del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  telefono?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'URL pública del logo. Se descarga al generar el RIDE y se cachea; si no responde, el PDF sale sin logo pero se genera igual.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  logoUrl?: string;
 }
 
 export class UpdateEmisorDto {
@@ -179,6 +231,44 @@ export class UpdateEmisorDto {
     message: `estado debe ser uno de: ${Object.values(EmisorEstado).join(', ')}`,
   })
   estado?: EmisorEstado;
+
+  // ─── Datos de marca del RIDE ──────────────────────────────────────────────
+
+  @ApiPropertyOptional({ description: 'Eslogan bajo el logo del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  eslogan?: string;
+
+  @ApiPropertyOptional({ description: 'Ciudad, para el pie del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  ciudad?: string;
+
+  @ApiPropertyOptional({ description: 'Email de contacto del pie del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Sitio web del pie del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  web?: string;
+
+  @ApiPropertyOptional({ description: 'Teléfono de contacto del pie del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  telefono?: string;
+
+  @ApiPropertyOptional({ description: 'URL pública del logo del RIDE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  logoUrl?: string;
 }
 
 export class EmisorResponseDto {
@@ -227,6 +317,24 @@ export class EmisorResponseDto {
   @ApiPropertyOptional()
   certificadoSujeto?: string;
 
+  @ApiPropertyOptional()
+  eslogan?: string;
+
+  @ApiPropertyOptional()
+  ciudad?: string;
+
+  @ApiPropertyOptional()
+  email?: string;
+
+  @ApiPropertyOptional()
+  web?: string;
+
+  @ApiPropertyOptional()
+  telefono?: string;
+
+  @ApiPropertyOptional()
+  logoUrl?: string;
+
   @ApiProperty()
   createdAt: string;
 
@@ -245,10 +353,11 @@ export class PaginatedEmisoresResponseDto {
   @ApiProperty({ type: [EmisorResponseDto] })
   data: EmisorResponseDto[];
 
-  @ApiPropertyOptional({ description: 'Cursor para la siguiente página, null si no hay más' })
+  @ApiPropertyOptional({
+    description: 'Cursor para la siguiente página, null si no hay más',
+  })
   nextCursor: string | null;
 
   @ApiProperty({ description: 'Indica si hay más elementos disponibles' })
   hasMore: boolean;
 }
-
