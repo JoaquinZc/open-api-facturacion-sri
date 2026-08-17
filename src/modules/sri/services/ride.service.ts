@@ -317,20 +317,25 @@ export class RideService {
         /**
          * El código que acompaña a la clave de acceso, como imagen embebida.
          *
-         * 🔴 **No se usa `:barcode(code128)` de Carbone.** Ese formatter existe
-         * desde Carbone 5.13.0 —10 de agosto de 2026— y solo en la edición
-         * Enterprise. El contenedor desplegado es anterior: al pedirle un
-         * formatter que no conoce, **falla el render entero con un 500** y no
-         * sale ningún RIDE, no solo el código.
+         * 🔴 **No se usa `:barcode(code128)` de Carbone.** Es una función de la
+         * edición Enterprise, y el contenedor corre en Community:
+         *
+         *     Formatter "barcode" is disabled in the Community Edition
+         *
+         * La imagen se llama `carbone-ee`, pero sin licencia arranca en CE — así
+         * que no es cuestión de actualizar, ahí no va a existir nunca. Y el
+         * fallo **tumba el render completo con un 500**: no se pierde solo esa
+         * imagen, no sale ningún RIDE.
          *
          * Así que la imagen viaja ya generada, por el mismo camino que el logo
          * —un Data URI en el texto alternativo—, que es mecanismo probado.
          *
          * ⚠️ Hoy es un **QR**, no el Code 128 que describe la ficha técnica del
-         * SRI. Para el código de barras hacen falta dos cosas: subir Carbone a
-         * 5.13+ y volver a poner el formatter, o añadir una librería que lo
-         * genere aquí. Los 49 dígitos impresos —la parte que exige la norma—
-         * están en el documento en cualquier caso.
+         * SRI. Para tener el código de barras hay dos caminos: licenciar Carbone
+         * Enterprise, o generarlo aquí con una librería y seguir mandándolo por
+         * este mismo campo — la plantilla no habría que tocarla. Los 49 dígitos
+         * impresos, que son la parte que exige la norma, están en el documento
+         * en cualquier caso.
          */
         claveAccesoBarcode: extras.qrDataUri,
         /** No se emiten guías de remisión desde aquí. */
