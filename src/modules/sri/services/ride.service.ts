@@ -24,17 +24,31 @@ export class RideService {
   private static readonly RIDE_TEMPLATE_ID = 'ride';
 
   /**
-   * PNG de 1×1 transparente.
+   * PNG de 1×1 **realmente transparente**: `RGBA(0, 0, 0, 0)`.
    *
-   * 🔴 **Es obligatorio, no un adorno.** Las imágenes se meten en la plantilla
+   * 🔴 **El anterior no lo era, y se veía.** La constante que había heredada
+   * decía «transparente» y su único píxel era `RGBA(0, 0, 255, 127)` — azul
+   * puro al 50 %. Compuesto sobre el papel blanco da un morado claro, y eso es
+   * exactamente lo que salía impreso en el hueco del logo de cualquier negocio
+   * sin logo propio: un rectángulo liso de color.
+   *
+   * No se notó durante meses porque **nunca llegaba a dibujarse**: Carbone no
+   * sustituía imágenes, así que el hueco conservaba el relleno de la plantilla.
+   * Al arreglar la sustitución, el píxel equivocado pasó a ser visible.
+   *
+   * Este está generado a mano y comprobado descomprimiendo su IDAT — no
+   * copiado de ningún sitio. `ride.pixel.spec.ts` lo vuelve a comprobar en cada
+   * ejecución, porque «es transparente» es justo la clase de afirmación que
+   * nadie verifica.
+   *
+   * **Es obligatorio, no un adorno.** Las imágenes se meten en la plantilla
    * sustituyendo su relleno, y el relleno de `ride.docx` es el logo de
    * Darkmelon y un código de barras decorativo. No sustituir cuando falta el
-   * dato **no deja el hueco vacío: deja el relleno**, y entonces la factura de
-   * un negocio saldría con el logo de Darkmelon y un código que no es su clave
-   * de acceso. Poner el píxel transparente es lo que borra el hueco.
+   * dato **no deja el hueco vacío: deja el relleno**, y la factura de un
+   * negocio saldría con la marca de Darkmelon.
    */
   private static readonly PIXEL_TRANSPARENTE = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',
     'base64',
   );
 
