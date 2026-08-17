@@ -3,9 +3,23 @@
 Un fichero PNG por emisor, **nombrado con su RUC**:
 
 ```
-templates/logos/1391939437001.png   ← DARKMELON CONSULTING S.A.S.
+templates/logos/1391939437001.png   ← DARKMELON CONSULTING S.A.S.  (ya está)
 templates/logos/1316995008001.png   ← el negocio que emite sus propias BO/RC
 ```
+
+## De dónde sale el de Darkmelon
+
+Del isotipo oficial —«El Núcleo Iluminado»— que vive en
+`deliveria-frontend/src/components/brand.tsx` (`DarkmelonMark`): círculo
+`#1A1A2E` de radio 80 y cuña cian `#00BFFF` entre los radios 80 y 100, sobre un
+viewBox de 200×200. Aquí se acompaña del wordmark en Arial Bold del mismo
+`#1A1A2E`.
+
+**Se omite el resplandor blanco** que la marca lleva en pantalla: está pensado
+para fondo oscuro y sobre papel blanco no se ve — solo engordaría el fichero.
+
+Para regenerarlo tras un cambio de marca, es ese SVG convertido a PNG a 840×240
+con fondo transparente.
 
 `RideService.cargarLogo()` lo busca por el RUC del comprobante. Si no existe,
 usa un píxel transparente y el RIDE sale sin logo — **no falla**.
