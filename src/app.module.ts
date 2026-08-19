@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { join } from 'path';
 
 import configuration from './config/configuration';
 
@@ -61,36 +59,32 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
       inject: [ConfigService],
     }),
 
-    // Serve Static Files
-    ServeStaticModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        const pdfDir = configService.get<string>('directories.pdfs')!;
-        return [
-          {
-            rootPath: join(pdfDir, 'con_firma'),
-            serveRoot: '/pdfs/con_firma',
-          },
-          {
-            rootPath: join(pdfDir, 'others'),
-            serveRoot: '/pdfs/others',
-          },
-          {
-            rootPath: join(pdfDir, 'documents'),
-            serveRoot: '/pdfs/documents',
-          },
-          {
-            rootPath: pdfDir,
-            serveRoot: '/pdfs',
-          },
-          {
-            rootPath: join(pdfDir, 'images'),
-            serveRoot: '/images',
-          },
-        ];
-      },
-      inject: [ConfigService],
-    }),
+    /*
+     * ═══ Los PDF ya NO se sirven como ficheros estáticos ══════════════════
+     *
+     * 🔴 **Era la única vía sin autenticación de todo el servicio.** El
+     * `JwtAuthGuard` global no protegía nada de esto: el middleware de
+     * estáticos responde antes de que ninguna guarda llegue a ejecutarse. Y
+     * los nombres eran `documento_${Date.now()}.pdf` — un timestamp en
+     * milisegundos, enumerable si se sabe más o menos cuándo se generó.
+     *
+     * Cualquiera con la URL —o con paciencia— podía descargar el documento de
+     * cualquier emisor, saltándose por completo el aislamiento por tenant.
+     *
+     * **No se pierde nada al quitarlo:**
+     *
+     * - El **RIDE** nunca pasó por aquí. `GET /sri/comprobantes/:clave/ride`
+     *   lo regenera en memoria en cada descarga, con JWT y validación de
+     *   acceso al comprobante. Es el camino correcto y el único que usa
+     *   `business`.
+     * - Lo que sí caía en `/data/pdfs` eran las salidas de `POST /pdf/generate*`,
+     *   un generador genérico heredado del proyecto original. Se comprobó que
+     *   **ni `business` ni el panel referencian ninguna URL `/pdfs/`**.
+     *
+     * Si algún día hace falta entregar un fichero guardado, la forma es un
+     * endpoint autenticado que compruebe el tenant —como hacen el RIDE y el
+     * XML—, no un directorio abierto.
+     */
 
     // Common Services
     EncryptionModule,
@@ -143,4 +137,3 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
   ],
 })
 export class AppModule {}
-
