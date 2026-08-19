@@ -52,6 +52,13 @@ COPY --from=builder /app/dist ./dist
 # Copy DB schema — lo lee dist/scripts/db-bootstrap.js en el arranque
 COPY --from=builder /app/database ./database
 
+# Utilidades que se ejecutan a mano contra el contenedor en marcha
+# (`railway run node scripts/…`). Son JavaScript plano, no pasan por `tsc`, así
+# que no aparecen en `dist/` — y sin esta línea existen en el repositorio pero
+# **no dentro de la imagen**, que es justo donde hacen falta: la de migrar los
+# XML tiene que leer el volumen montado.
+COPY --from=builder /app/scripts ./scripts
+
 # Plantillas del RIDE. **Van en la imagen, no en el volumen**: son código, se
 # versionan con la aplicación y deben actualizarse al desplegar.
 #
