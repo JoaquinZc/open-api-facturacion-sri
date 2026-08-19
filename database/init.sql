@@ -329,7 +329,9 @@ CREATE TABLE public.comprobante_xmls (
     comprobante_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     xml_autorizado_path character varying(500),
-    xml_firmado_path character varying(500)
+    xml_firmado_path character varying(500),
+    xml_firmado_contenido text,
+    xml_autorizado_contenido text
 );
 
 

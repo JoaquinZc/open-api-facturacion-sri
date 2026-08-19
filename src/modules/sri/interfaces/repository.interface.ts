@@ -122,8 +122,18 @@ export interface ImpuestoDocSustentoRecord {
 export interface XmlRecord {
   id?: string;
   comprobante_id: string;
-  xml_firmado_path?: string;
-  xml_autorizado_path?: string;
+  /** Clave en el almacenamiento de objetos. `null` si la subida falló. */
+  xml_firmado_path?: string | null;
+  xml_autorizado_path?: string | null;
+  /**
+   * El XML entero, **solo cuando la subida falló**.
+   *
+   * No es una copia de todo: es la red que impide perder un comprobante si S3
+   * no responde justo después de que el SRI ya lo haya recibido. Ver
+   * `XmlStorageService`.
+   */
+  xml_firmado_contenido?: string | null;
+  xml_autorizado_contenido?: string | null;
 }
 
 export interface InfoAdicionalRecord {

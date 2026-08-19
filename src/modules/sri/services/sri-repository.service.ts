@@ -379,14 +379,32 @@ export class SriRepositoryService {
       ? client.query.bind(client)
       : this.db.query.bind(this.db);
 
+    /*
+     * Los `_contenido` son el respaldo de cuando el almacenamiento de objetos
+     * no respondió. **Van en el mismo INSERT a propósito**: esto corre dentro
+     * de la transacción del comprobante, así que o se guarda el comprobante con
+     * su XML o no se guarda nada — nunca una fila que apunta a un objeto que no
+     * llegó a subirse.
+     */
     const result = await queryFn(
-      `INSERT INTO comprobante_xmls (comprobante_id, xml_firmado_path, xml_autorizado_path)
-       VALUES ($1, $2, $3)
+      `INSERT INTO comprobante_xmls (
+         comprobante_id, xml_firmado_path, xml_autorizado_path,
+         xml_firmado_contenido, xml_autorizado_contenido
+       )
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (comprobante_id) DO UPDATE SET
          xml_firmado_path = COALESCE($2, comprobante_xmls.xml_firmado_path),
-         xml_autorizado_path = COALESCE($3, comprobante_xmls.xml_autorizado_path)
+         xml_autorizado_path = COALESCE($3, comprobante_xmls.xml_autorizado_path),
+         xml_firmado_contenido = COALESCE($4, comprobante_xmls.xml_firmado_contenido),
+         xml_autorizado_contenido = COALESCE($5, comprobante_xmls.xml_autorizado_contenido)
        RETURNING *`,
-      [data.comprobante_id, data.xml_firmado_path, data.xml_autorizado_path],
+      [
+        data.comprobante_id,
+        data.xml_firmado_path,
+        data.xml_autorizado_path,
+        data.xml_firmado_contenido ?? null,
+        data.xml_autorizado_contenido ?? null,
+      ],
     );
     return result.rows[0];
   }
@@ -758,37 +776,64 @@ export class SriRepositoryService {
   /**
    * Obtiene el path del XML autorizado de un comprobante
    */
-  async findXmlAutorizado(comprobanteId: string): Promise<string | null> {
-    const result = await this.db.queryOne<{ xml_autorizado_path: string }>(
-      `SELECT xml_autorizado_path FROM comprobante_xmls WHERE comprobante_id = $1`,
+  async findXmlAutorizado(
+    comprobanteId: string,
+  ): Promise<{ path: string | null; contenido: string | null }> {
+    const result = await this.db.queryOne<{
+      xml_autorizado_path: string | null;
+      xml_autorizado_contenido: string | null;
+    }>(
+      `SELECT xml_autorizado_path, xml_autorizado_contenido
+         FROM comprobante_xmls WHERE comprobante_id = $1`,
       [comprobanteId],
     );
-    return result?.xml_autorizado_path || null;
+
+    return {
+      path: result?.xml_autorizado_path ?? null,
+      contenido: result?.xml_autorizado_contenido ?? null,
+    };
   }
 
   /**
    * Obtiene el path del XML firmado de un comprobante
    */
-  async findXmlFirmado(comprobanteId: string): Promise<string | null> {
-    const result = await this.db.queryOne<{ xml_firmado_path: string }>(
-      `SELECT xml_firmado_path FROM comprobante_xmls WHERE comprobante_id = $1`,
+  async findXmlFirmado(
+    comprobanteId: string,
+  ): Promise<{ path: string | null; contenido: string | null }> {
+    const result = await this.db.queryOne<{
+      xml_firmado_path: string | null;
+      xml_firmado_contenido: string | null;
+    }>(
+      `SELECT xml_firmado_path, xml_firmado_contenido
+         FROM comprobante_xmls WHERE comprobante_id = $1`,
       [comprobanteId],
     );
-    return result?.xml_firmado_path || null;
+
+    return {
+      path: result?.xml_firmado_path ?? null,
+      contenido: result?.xml_firmado_contenido ?? null,
+    };
   }
 
   /**
    * Obtiene el registro completo de XMLs de un comprobante
    */
   async findXmlByComprobanteId(comprobanteId: string): Promise<{
-    xml_firmado_path?: string;
-    xml_autorizado_path?: string;
+    xml_firmado_path?: string | null;
+    xml_autorizado_path?: string | null;
+    /** Con valor solo cuando la subida a objetos falló. */
+    xml_firmado_contenido?: string | null;
+    xml_autorizado_contenido?: string | null;
   } | null> {
     const result = await this.db.queryOne<{
-      xml_firmado_path: string;
-      xml_autorizado_path: string;
+      xml_firmado_path: string | null;
+      xml_autorizado_path: string | null;
+      xml_firmado_contenido: string | null;
+      xml_autorizado_contenido: string | null;
     }>(
-      `SELECT xml_firmado_path, xml_autorizado_path FROM comprobante_xmls WHERE comprobante_id = $1`,
+      `SELECT xml_firmado_path, xml_autorizado_path,
+              xml_firmado_contenido, xml_autorizado_contenido
+         FROM comprobante_xmls WHERE comprobante_id = $1`,
       [comprobanteId],
     );
     return result || null;

@@ -431,12 +431,13 @@ export class SriService {
     if (!comprobante || !comprobante.id) {
       return null;
     }
-    const xmlPath = await this.repository.findXmlAutorizado(comprobante.id);
-    if (!xmlPath) {
-      return null;
-    }
-    // Read XML content from file
-    return this.xmlStorage.readXml(xmlPath);
+    const { path, contenido } = await this.repository.findXmlAutorizado(
+      comprobante.id,
+    );
+
+    // El respaldo gana: si existe, es que la subida falló y en el
+    // almacenamiento de objetos no hay nada que buscar.
+    return this.xmlStorage.readXml(path, contenido);
   }
 
   /**
@@ -569,7 +570,13 @@ export class SriService {
       comprobante.id!,
     );
 
-    if (!xmlRecord?.xml_firmado_path) {
+    /*
+     * **Vale cualquiera de los dos.** Un comprobante guardado mientras el
+     * almacenamiento de objetos no respondía no tiene `path` pero sí
+     * contenido, y se puede reenviar igual: exigir la ruta lo daría por
+     * irrecuperable teniéndolo delante.
+     */
+    if (!xmlRecord?.xml_firmado_path && !xmlRecord?.xml_firmado_contenido) {
       throw new BadRequestException(
         `No existe registro de XML firmado para el comprobante ${claveAcceso}. ` +
           `El comprobante no puede ser reenviado.`,
@@ -577,13 +584,18 @@ export class SriService {
     }
 
     // Normalizar path para cross-platform (Windows/Linux)
-    const xmlFirmadoPath = xmlRecord.xml_firmado_path.replace(/\\/g, '/');
-    const xmlFirmado = this.xmlStorage.readXml(xmlFirmadoPath);
+    const xmlFirmadoPath =
+      xmlRecord.xml_firmado_path?.replace(/\\/g, '/') ?? null;
+    const xmlFirmado = await this.xmlStorage.readXml(
+      xmlFirmadoPath,
+      xmlRecord.xml_firmado_contenido,
+    );
 
     if (!xmlFirmado) {
       throw new BadRequestException(
-        `No se encontró el archivo XML firmado en: ${xmlFirmadoPath}. ` +
-          `El archivo puede haber sido eliminado.`,
+        `No se encontró el XML firmado de ${claveAcceso} (ruta: ${xmlFirmadoPath ?? 'ninguna'}). ` +
+          `Puede haberse perdido si se emitió antes de que los XML fueran al ` +
+          `almacenamiento de objetos y el contenedor se recicló.`,
       );
     }
 
@@ -612,7 +624,7 @@ export class SriService {
       const rucEmisor = extractRucFromClaveAcceso(claveAcceso);
       const fecha = new Date(comprobante.fecha_emision);
 
-      const autorizadoPath = this.xmlStorage.saveXml(
+      const autorizado = await this.xmlStorage.saveXml(
         rucEmisor,
         claveAcceso,
         fecha,
@@ -621,7 +633,9 @@ export class SriService {
       );
       await this.repository.saveXml({
         comprobante_id: comprobante.id as string,
-        xml_autorizado_path: autorizadoPath,
+        xml_autorizado_path: autorizado.path,
+        // Con valor solo si la subida falló; ver XmlStorageService.
+        xml_autorizado_contenido: autorizado.contenido,
       });
     }
 
@@ -836,7 +850,7 @@ export class SriService {
               if (auth.comprobante) {
                 const fecha = new Date(comp.fechaEmision);
                 const ruc = extractRucFromClaveAcceso(comp.claveAcceso);
-                const autorizadoPath = this.xmlStorage.saveXml(
+                const autorizado = await this.xmlStorage.saveXml(
                   ruc,
                   comp.claveAcceso,
                   fecha,
@@ -845,7 +859,9 @@ export class SriService {
                 );
                 await this.repository.saveXml({
                   comprobante_id: comp.id as string,
-                  xml_autorizado_path: autorizadoPath,
+                  xml_autorizado_path: autorizado.path,
+        // Con valor solo si la subida falló; ver XmlStorageService.
+        xml_autorizado_contenido: autorizado.contenido,
                 });
               }
 

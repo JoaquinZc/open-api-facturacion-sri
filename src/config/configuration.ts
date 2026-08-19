@@ -116,6 +116,28 @@ export default () => ({
     xmls: resolveDir(requireEnv('XMLS_DIR')),
   },
 
+  /*
+   * Almacenamiento de objetos (S3 o R2) — **opcional en el arranque, necesario
+   * en producción.**
+   *
+   * Todo `optionalEnv`: sin credenciales el servicio levanta igual y los XML
+   * caen al respaldo de la base. Hacerlo obligatorio impediría arrancar en
+   * desarrollo por algo que allí no hace falta.
+   *
+   * `S3_ENDPOINT` es lo único que distingue R2 de AWS. Con R2 la región es
+   * `auto`; con AWS se pone la real.
+   */
+  storage: {
+    bucket: optionalEnv('S3_BUCKET', ''),
+    accessKeyId: optionalEnv('S3_ACCESS_KEY_ID', ''),
+    secretAccessKey: optionalEnv('S3_SECRET_ACCESS_KEY', ''),
+    region: optionalEnv('S3_REGION', 'auto'),
+    /** Vacío = AWS S3. Con valor = R2 u otro compatible. */
+    endpoint: optionalEnv('S3_ENDPOINT', ''),
+    /** Para poder compartir bucket con otros servicios sin pisarse. */
+    prefix: optionalEnv('S3_PREFIX', 'facturacion-sri'),
+  },
+
   // Tenants configuration
   tenants: {
     defaultPlan: optionalEnv('TENANT_DEFAULT_PLAN', 'BASICO'),

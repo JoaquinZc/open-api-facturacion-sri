@@ -473,7 +473,7 @@ export class FacturaService {
         parseInt(dto.fechaEmision.split('/')[1]) - 1,
         parseInt(dto.fechaEmision.split('/')[0]),
       );
-      const xmlPaths = this.xmlStorage.saveAllXmls(
+      const xmlPaths = await this.xmlStorage.saveAllXmls(
         dto.emisor.ruc,
         claveAcceso,
         fechaEmision,
@@ -484,8 +484,11 @@ export class FacturaService {
       await this.repository.saveXml(
         {
           comprobante_id: comprobante.id!,
-          xml_firmado_path: xmlPaths.firmadoPath,
-          xml_autorizado_path: xmlPaths.autorizadoPath,
+          xml_firmado_path: xmlPaths.firmado?.path ?? null,
+          xml_autorizado_path: xmlPaths.autorizado?.path ?? null,
+          // Solo viene con valor si la subida falló; ver XmlStorageService.
+          xml_firmado_contenido: xmlPaths.firmado?.contenido ?? null,
+          xml_autorizado_contenido: xmlPaths.autorizado?.contenido ?? null,
         },
         client,
       );

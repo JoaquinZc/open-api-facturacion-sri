@@ -657,8 +657,8 @@ describe('SriService — Consultas', () => {
   describe('obtenerXmlAutorizado()', () => {
     it('U-XML-01: XML disponible retorna string con contenido', async () => {
       repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'AUTORIZADO' } as any);
-      repository.findXmlAutorizado.mockResolvedValue('/path/to/xml.xml' as any);
-      xmlStorage.readXml.mockReturnValue('<?xml version="1.0"?>...');
+      repository.findXmlAutorizado.mockResolvedValue({ path: '/path/to/xml.xml', contenido: null });
+      xmlStorage.readXml.mockResolvedValue('<?xml version="1.0"?>...');
 
       const result = await service.obtenerXmlAutorizado('0702202601092438363100110010010000000161245294013');
 
@@ -668,7 +668,7 @@ describe('SriService — Consultas', () => {
 
     it('U-XML-02: XML no disponible retorna null', async () => {
       repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'PENDIENTE' } as any);
-      repository.findXmlAutorizado.mockResolvedValue(null as any);
+      repository.findXmlAutorizado.mockResolvedValue({ path: null, contenido: null });
 
       const result = await service.obtenerXmlAutorizado('0702202601092438363100110010010000000161245294013');
 
@@ -764,7 +764,7 @@ describe('SriService — Consultas', () => {
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/firmado.xml',
       } as any);
-      xmlStorage.readXml.mockReturnValue('<?xml version="1.0"?><factura>...</factura>');
+      xmlStorage.readXml.mockResolvedValue('<?xml version="1.0"?><factura>...</factura>');
       sriSoapClient.enviarYAutorizar.mockResolvedValue({
         success: true,
         estado: 'AUTORIZADO',
@@ -775,7 +775,7 @@ describe('SriService — Consultas', () => {
         mensajes: [],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockReturnValue('/path/to/autorizado.xml');
+      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.reintentarComprobante(claveAcceso);
@@ -796,7 +796,7 @@ describe('SriService — Consultas', () => {
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/firmado.xml',
       } as any);
-      xmlStorage.readXml.mockReturnValue('<?xml version="1.0"?>...');
+      xmlStorage.readXml.mockResolvedValue('<?xml version="1.0"?>...');
       sriSoapClient.enviarYAutorizar.mockResolvedValue({
         success: false,
         estado: 'RECHAZADO',
@@ -835,7 +835,7 @@ describe('SriService — Consultas', () => {
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/firmado.xml',
       } as any);
-      xmlStorage.readXml.mockReturnValue(null as unknown as string);
+      xmlStorage.readXml.mockResolvedValue(null);
 
       await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(BadRequestException);
     });
@@ -845,7 +845,7 @@ describe('SriService — Consultas', () => {
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/firmado.xml',
       } as any);
-      xmlStorage.readXml.mockReturnValue('<?xml version="1.0"?>...');
+      xmlStorage.readXml.mockResolvedValue('<?xml version="1.0"?>...');
       sriSoapClient.enviarYAutorizar.mockResolvedValue({
         success: false,
         estado: 'DEVUELTA',
@@ -881,7 +881,7 @@ describe('SriService — Consultas', () => {
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/signed.xml',
       } as any);
-      xmlStorage.readXml.mockReturnValue('<factura>signed</factura>');
+      xmlStorage.readXml.mockResolvedValue('<factura>signed</factura>');
       sriSoapClient.enviarYAutorizar.mockResolvedValue({
         success: true,
         estado: 'AUTORIZADO',
@@ -891,7 +891,7 @@ describe('SriService — Consultas', () => {
         mensajes: [],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockReturnValue('/path/to/autorizado.xml');
+      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.reintentarComprobante(claveAcceso);
@@ -909,7 +909,7 @@ describe('SriService — Consultas', () => {
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/signed.xml',
       } as any);
-      xmlStorage.readXml.mockReturnValue('<factura>signed</factura>');
+      xmlStorage.readXml.mockResolvedValue('<factura>signed</factura>');
       sriSoapClient.enviarYAutorizar.mockResolvedValue({
         success: false,
         estado: 'DEVUELTA',
@@ -942,7 +942,7 @@ describe('SriService — Consultas', () => {
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/signed.xml',
       } as any);
-      xmlStorage.readXml.mockReturnValue('<factura>signed</factura>');
+      xmlStorage.readXml.mockResolvedValue('<factura>signed</factura>');
       sriSoapClient.enviarYAutorizar.mockResolvedValue({
         success: true,
         estado: 'AUTORIZADO',
@@ -952,7 +952,7 @@ describe('SriService — Consultas', () => {
         mensajes: [],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockReturnValue('/path/to/autorizado.xml');
+      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.reintentarComprobante(claveAcceso);
@@ -1178,7 +1178,7 @@ describe('SriService — Consultas', () => {
         },
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockReturnValue('/path/to/autorizado.xml');
+      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.sincronizarConSri({ limite: 10 });
@@ -1203,7 +1203,7 @@ describe('SriService — Consultas', () => {
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/firmado.xml',
       } as any);
-      xmlStorage.readXml.mockReturnValue('<?xml version="1.0"?>...');
+      xmlStorage.readXml.mockResolvedValue('<?xml version="1.0"?>...');
       sriSoapClient.enviarYAutorizar.mockResolvedValue({
         success: true,
         estado: 'AUTORIZADO',
@@ -1214,7 +1214,7 @@ describe('SriService — Consultas', () => {
         mensajes: [],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockReturnValue('/path/to/autorizado.xml');
+      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.sincronizarConSri({ reintentar: true, limite: 10 });
@@ -1278,7 +1278,7 @@ describe('SriService — Consultas', () => {
           },
         } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockReturnValue('/path');
+      xmlStorage.saveXml.mockResolvedValue({ path: '/path', contenido: null });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.sincronizarConSri({ limite: 10 });
@@ -1303,7 +1303,7 @@ describe('SriService — Consultas', () => {
         },
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockReturnValue('/path');
+      xmlStorage.saveXml.mockResolvedValue({ path: '/path', contenido: null });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       await service.sincronizarConSri({ limite: 10 });

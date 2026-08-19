@@ -44,6 +44,8 @@
     "docker:push": "npm run docker:build && docker tag open-api-facturacion-sri angelobarzola/open-api-facturacion-sri:latest && docker push angelobarzola/open-api-facturacion-sri:latest"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1113.0",
+    "@aws-sdk/s3-request-presigner": "^3.1113.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/cache-manager": "^3.1.2",

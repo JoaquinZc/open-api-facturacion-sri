@@ -208,6 +208,26 @@ const ADDITIVE_MIGRATIONS: Array<{ nombre: string; sql: string }> = [
         ADD COLUMN IF NOT EXISTS logo_url character varying(500)
     `,
   },
+  {
+    /*
+     * El respaldo de los XML cuando el almacenamiento de objetos no responde.
+     *
+     * 🔴 **No es una copia de todo: solo se rellena si la subida falló.** El
+     * guardado ocurre después de mandar el comprobante al SRI, así que no puede
+     * fallar — si lanzara, la transacción haría rollback, el comprobante
+     * desaparecería de la base y el SRI seguiría teniéndolo. Estas dos columnas
+     * son lo que hace que ese caso no pierda el documento.
+     *
+     * `text` y no `varchar`: un XML de factura ronda los 10 KB pero no hay un
+     * tope razonable que poner, y en PostgreSQL los dos se almacenan igual.
+     */
+    nombre: 'comprobante_xmls: respaldo del contenido',
+    sql: `
+      ALTER TABLE public.comprobante_xmls
+        ADD COLUMN IF NOT EXISTS xml_firmado_contenido    text,
+        ADD COLUMN IF NOT EXISTS xml_autorizado_contenido text
+    `,
+  },
 ];
 
 async function applyAdditiveMigrations(client: Client): Promise<void> {

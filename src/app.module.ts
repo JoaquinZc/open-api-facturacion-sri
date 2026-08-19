@@ -36,6 +36,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { CatalogosModule } from './modules/catalogos/catalogos.module';
 
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ObjectStorageModule } from './common/storage/object-storage.module';
 
 @Module({
   imports: [
@@ -91,6 +92,9 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     AuditModule,
     QueueModule,
     RedisCacheModule,
+    // Global: los XML del SRI y cualquier otro fichero que haya que conservar
+    // van a S3/R2, no al disco del contenedor.
+    ObjectStorageModule,
 
     // Database Module
     DatabaseModule,

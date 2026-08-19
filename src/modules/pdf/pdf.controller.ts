@@ -11,11 +11,13 @@ import {
   UploadedFile,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { ObjectStorageService } from '../../common/storage/object-storage.service';
 import {
   existsSync,
   writeFileSync,
@@ -48,12 +50,14 @@ import {
 @ApiTags('Generate PDF')
 @Controller('generate-pdf')
 export class PdfController {
+  private readonly logger = new Logger(PdfController.name);
   private readonly publicUrl: string;
 
   constructor(
     private readonly pdfService: PdfService,
     private readonly templateService: TemplateService,
     private readonly configService: ConfigService,
+    private readonly objectStorage: ObjectStorageService,
   ) {
     this.publicUrl = this.configService.get<string>('publicUrl')!;
   }
@@ -121,22 +125,44 @@ export class PdfController {
       templatePath,
     );
 
-    // Generate unique filename
+    /*
+     * ═══ Ya no se escribe en disco ════════════════════════════════════════
+     *
+     * Antes esto guardaba el PDF en `/data/pdfs/others` y devolvía una URL a un
+     * directorio servido como estático **sin autenticación**, con nombre
+     * `documento_<timestamp>.pdf` — enumerable. Ese directorio se retiró.
+     *
+     * Ahora va al almacenamiento de objetos y se devuelve una **URL firmada que
+     * caduca**: el cliente descarga directamente y este servicio no hace de
+     * intermediario. Una URL filtrada deja de servir sola, al revés que un
+     * fichero en un directorio abierto.
+     *
+     * Sin almacenamiento configurado **no se guarda y se dice**, en vez de
+     * dejar el fichero en un disco que el próximo despliegue borra y devolver
+     * una URL que no va a resolver.
+     */
     const fileName = `documento_${Date.now()}.pdf`;
-    const filePath = join(STORAGE_PATHS.pdfsOthers, fileName);
+    const key = `pdfs/${fileName}`;
 
-    // Save the PDF
-    writeFileSync(filePath, pdfBuffer);
+    let fileUrl: string | null = null;
 
-    // Build file URL
-    const fileUrl = `${this.publicUrl}/pdfs/others/${fileName}`;
+    if (this.objectStorage.isEnabled()) {
+      await this.objectStorage.put(key, pdfBuffer, 'application/pdf');
+      fileUrl = await this.objectStorage.presignedUrl(key);
+    } else {
+      this.logger.warn(
+        'Sin almacenamiento de objetos: el PDF no se guarda y no hay URL de descarga.',
+      );
+    }
 
     return {
       success: true,
       data: {
-        message: 'PDF generado correctamente',
-        fileName: fileName,
-        fileUrl: fileUrl,
+        message: fileUrl
+          ? 'PDF generado correctamente'
+          : 'PDF generado, pero no se guardó: falta configurar el almacenamiento de objetos',
+        fileName,
+        fileUrl,
         fileSize: Buffer.byteLength(pdfBuffer),
         templateUsed: basename(templatePath),
       },
@@ -224,22 +250,29 @@ export class PdfController {
       images,
     );
 
-    // Generate unique filename
+    // Al almacenamiento de objetos, no al disco. Ver la nota de `generatePdf`.
     const fileName = `documento_con_imagenes_${Date.now()}.pdf`;
-    const filePath = join(STORAGE_PATHS.pdfsOthers, fileName);
+    const key = `pdfs/${fileName}`;
 
-    // Save the PDF
-    writeFileSync(filePath, pdfBuffer);
+    let fileUrl: string | null = null;
 
-    // Build file URL
-    const fileUrl = `${this.publicUrl}/pdfs/others/${fileName}`;
+    if (this.objectStorage.isEnabled()) {
+      await this.objectStorage.put(key, pdfBuffer, 'application/pdf');
+      fileUrl = await this.objectStorage.presignedUrl(key);
+    } else {
+      this.logger.warn(
+        'Sin almacenamiento de objetos: el PDF no se guarda y no hay URL de descarga.',
+      );
+    }
 
     return {
       success: true,
       data: {
-        message: 'PDF con imágenes generado correctamente',
-        fileName: fileName,
-        fileUrl: fileUrl,
+        message: fileUrl
+          ? 'PDF con imágenes generado correctamente'
+          : 'PDF generado, pero no se guardó: falta configurar el almacenamiento de objetos',
+        fileName,
+        fileUrl,
         fileSize: Buffer.byteLength(pdfBuffer),
         templateUsed: basename(templatePath),
         imagesAdded: images ? images.length : 0,
