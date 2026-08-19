@@ -316,9 +316,30 @@ export class RideService {
         `${rucEmisor}.png`,
       );
 
-      if (!existsSync(ruta)) return RideService.PIXEL_TRANSPARENTE;
+      if (existsSync(ruta)) return readFileSync(ruta);
 
-      return readFileSync(ruta);
+      /*
+       * 🔴 **Este aviso es el que faltaba.** Sin logo la factura sale con el
+       * hueco vacío, y desde fuera eso se ve idéntico haya fallado lo que haya
+       * fallado: que el emisor no tenga URL, que la descarga se rompiera, o que
+       * el fichero de respaldo no exista. Tres causas, un solo síntoma — y solo
+       * una la arregla el dueño del negocio.
+       *
+       * Costó dos rondas de «sigue sin salir» descubrir que aquí no se decía
+       * nada. Ahora una sola generación de RIDE responde en qué eslabón se
+       * corta.
+       */
+      this.logger.warn(
+        `RIDE de ${rucEmisor} SIN LOGO. ` +
+          (logoUrl?.trim()
+            ? `El emisor tiene logo_url (${logoUrl.trim()}) pero no se pudo descargar — ` +
+              `revisa el aviso anterior: puede ser el tipo de contenido, el tamaño o el destino.`
+            : `El emisor NO tiene logo_url: business no lo ha enviado. ` +
+              `Comprueba que el negocio tenga imagen y vuelve a guardar su alta fiscal.`) +
+          ` Tampoco hay respaldo en ${ruta}.`,
+      );
+
+      return RideService.PIXEL_TRANSPARENTE;
     } catch {
       return RideService.PIXEL_TRANSPARENTE;
     }
