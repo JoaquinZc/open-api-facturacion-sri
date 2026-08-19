@@ -478,11 +478,19 @@ export class RideService {
           return null;
         }
 
-        const tipo = respuesta.headers.get('content-type') ?? '';
-        if (!tipo.startsWith('image/')) {
-          this.logger.warn(`El logo ${url} no es una imagen (${tipo})`);
-          return null;
-        }
+        /*
+         * ⚠️ **No se filtra por `Content-Type`.** Se intentó, y es un filtro
+         * que solo puede rechazar de más: un objeto subido a S3 sin tipo
+         * explícito se sirve como `binary/octet-stream`, y un CDN por medio
+         * puede cambiarlo. El logo se descartaba en silencio siendo una imagen
+         * perfectamente válida.
+         *
+         * Lo que de verdad protege es la firma de los bytes, y ya se comprueba
+         * donde importa: `docx-imagenes.ts` mira los números mágicos y descarta
+         * lo que no sea PNG, JPEG o GIF antes de meterlo en el documento. Una
+         * cabecera que dice «soy una imagen» no es una garantía; los primeros
+         * cuatro bytes sí.
+         */
 
         /*
          * Se corta por `Content-Length` **antes** de leer el cuerpo. Sin esto,
