@@ -84,7 +84,8 @@ export class PdfService {
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       '.odt': 'application/vnd.oasis.opendocument.text',
       '.html': 'text/html',
-      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.xlsx':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
     };
     formData.append('template', templateBuffer, {

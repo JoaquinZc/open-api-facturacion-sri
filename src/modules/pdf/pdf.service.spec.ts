@@ -58,7 +58,11 @@ describe('PdfService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    pdfImageService = { addImagesToPdf: jest.fn().mockResolvedValue(Buffer.from('pdf-with-images')) };
+    pdfImageService = {
+      addImagesToPdf: jest
+        .fn()
+        .mockResolvedValue(Buffer.from('pdf-with-images')),
+    };
     configService = {
       get: jest.fn((key: string) => {
         if (key === 'carboneApi') return 'http://carbone.test/api';
@@ -82,13 +86,20 @@ describe('PdfService', () => {
   describe('generatePDF', () => {
     it('should generate PDF via Carbone API', async () => {
       (axios.post as jest.Mock)
-        .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
-        .mockResolvedValueOnce({ data: { success: true, data: { renderId: 'rnd-456' } } });
+        .mockResolvedValueOnce({
+          data: { success: true, data: { templateId: 'tpl-123' } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { renderId: 'rnd-456' } },
+        });
       (axios.get as jest.Mock)
         .mockResolvedValueOnce({ data: { success: true } })
         .mockResolvedValueOnce({ data: Buffer.from('fake-pdf') });
 
-      const result = await service.generatePDF({ title: 'Test' }, '/fake/templates/report.docx');
+      const result = await service.generatePDF(
+        { title: 'Test' },
+        '/fake/templates/report.docx',
+      );
 
       expect(result).toBeDefined();
       expect(axios.post).toHaveBeenCalledTimes(2);
@@ -96,7 +107,9 @@ describe('PdfService', () => {
     });
 
     it('should throw error when template upload fails', async () => {
-      (axios.post as jest.Mock).mockResolvedValueOnce({ data: { success: false } });
+      (axios.post as jest.Mock).mockResolvedValueOnce({
+        data: { success: false },
+      });
 
       await expect(
         service.generatePDF({ title: 'Test' }, '/fake/templates/report.docx'),
@@ -105,7 +118,9 @@ describe('PdfService', () => {
 
     it('should throw error when render fails', async () => {
       (axios.post as jest.Mock)
-        .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { templateId: 'tpl-123' } },
+        })
         .mockResolvedValueOnce({ data: { success: false } });
 
       await expect(
@@ -115,14 +130,21 @@ describe('PdfService', () => {
 
     it('should retry on status check failure', async () => {
       (axios.post as jest.Mock)
-        .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
-        .mockResolvedValueOnce({ data: { success: true, data: { renderId: 'rnd-456' } } });
+        .mockResolvedValueOnce({
+          data: { success: true, data: { templateId: 'tpl-123' } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { renderId: 'rnd-456' } },
+        });
       (axios.get as jest.Mock)
         .mockResolvedValueOnce({ data: { success: false } })
         .mockResolvedValueOnce({ data: { success: true } })
         .mockResolvedValueOnce({ data: Buffer.from('fake-pdf') });
 
-      const result = await service.generatePDF({ title: 'Test' }, '/fake/templates/report.docx');
+      const result = await service.generatePDF(
+        { title: 'Test' },
+        '/fake/templates/report.docx',
+      );
       expect(result).toBeDefined();
     });
   });
@@ -130,16 +152,36 @@ describe('PdfService', () => {
   describe('generatePDFWithImages', () => {
     it('should generate PDF and add images', async () => {
       (axios.post as jest.Mock)
-        .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
-        .mockResolvedValueOnce({ data: { success: true, data: { renderId: 'rnd-456' } } });
+        .mockResolvedValueOnce({
+          data: { success: true, data: { templateId: 'tpl-123' } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { renderId: 'rnd-456' } },
+        });
       (axios.get as jest.Mock)
         .mockResolvedValueOnce({ data: { success: true } })
         .mockResolvedValueOnce({ data: Buffer.from('fake-pdf') });
 
-      pdfImageService.addImagesToPdf.mockResolvedValue(Buffer.from('final-pdf'));
+      pdfImageService.addImagesToPdf.mockResolvedValue(
+        Buffer.from('final-pdf'),
+      );
 
-      const images = [{ url: 'http://test.com/img.png', page: 1, x: 10, y: 10, width: 100, height: 100, opacity: 1 }];
-      const result = await service.generatePDFWithImages({ title: 'Test' }, '/fake/templates/report.docx', images);
+      const images = [
+        {
+          url: 'http://test.com/img.png',
+          page: 1,
+          x: 10,
+          y: 10,
+          width: 100,
+          height: 100,
+          opacity: 1,
+        },
+      ];
+      const result = await service.generatePDFWithImages(
+        { title: 'Test' },
+        '/fake/templates/report.docx',
+        images,
+      );
 
       expect(result).toBeDefined();
       expect(pdfImageService.addImagesToPdf).toHaveBeenCalled();
@@ -147,13 +189,20 @@ describe('PdfService', () => {
 
     it('should generate PDF without images when none provided', async () => {
       (axios.post as jest.Mock)
-        .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
-        .mockResolvedValueOnce({ data: { success: true, data: { renderId: 'rnd-456' } } });
+        .mockResolvedValueOnce({
+          data: { success: true, data: { templateId: 'tpl-123' } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { renderId: 'rnd-456' } },
+        });
       (axios.get as jest.Mock)
         .mockResolvedValueOnce({ data: { success: true } })
         .mockResolvedValueOnce({ data: Buffer.from('fake-pdf') });
 
-      const result = await service.generatePDFWithImages({ title: 'Test' }, '/fake/templates/report.docx');
+      const result = await service.generatePDFWithImages(
+        { title: 'Test' },
+        '/fake/templates/report.docx',
+      );
       expect(result).toBeDefined();
       expect(pdfImageService.addImagesToPdf).not.toHaveBeenCalled();
     });
@@ -181,7 +230,15 @@ describe('PdfImageService', () => {
     it('should process images and return modified buffer', async () => {
       const pdfBuffer = Buffer.from('%PDF-1.4 test');
       const images = [
-        { url: 'http://test.com/img.png', page: 1, x: 10, y: 10, width: 100, height: 100, opacity: 1 },
+        {
+          url: 'http://test.com/img.png',
+          page: 1,
+          x: 10,
+          y: 10,
+          width: 100,
+          height: 100,
+          opacity: 1,
+        },
       ];
 
       global.fetch = jest.fn().mockResolvedValue({
@@ -190,9 +247,7 @@ describe('PdfImageService', () => {
       }) as any;
 
       // pdf-lib will fail to load the invalid PDF, but the service should handle it
-      await expect(
-        service.addImagesToPdf(pdfBuffer, images),
-      ).rejects.toThrow();
+      await expect(service.addImagesToPdf(pdfBuffer, images)).rejects.toThrow();
     });
   });
 });

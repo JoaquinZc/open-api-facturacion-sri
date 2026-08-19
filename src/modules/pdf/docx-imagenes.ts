@@ -47,6 +47,75 @@ const FIRMAS: Array<{ ext: string; tipo: string; magic: number[] }> = [
   { ext: 'gif', tipo: 'image/gif', magic: [0x47, 0x49, 0x46, 0x38] },
 ];
 
+/**
+ * Ancho y alto reales de la imagen, en píxeles.
+ *
+ * 🔴 **Sin esto la imagen sale deformada.** El hueco de la plantilla tiene un
+ * tamaño fijo —el logo son 32,9 × 13,7 mm, o sea 2,40:1— y Word estira lo que
+ * se meta ahí hasta llenarlo. Un logo cuadrado acababa aplastado a lo ancho.
+ *
+ * `null` si el formato no se reconoce; entonces se deja el hueco como estaba,
+ * que es lo que hacía antes.
+ */
+function dimensiones(b: Buffer): { w: number; h: number } | null {
+  // PNG: el IHDR va justo tras la firma, ancho y alto en big-endian.
+  if (b[0] === 0x89 && b[1] === 0x50) {
+    return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+  }
+
+  // GIF: cabecera de 13 bytes, ancho y alto en little-endian.
+  if (b[0] === 0x47 && b[1] === 0x49) {
+    return { w: b.readUInt16LE(6), h: b.readUInt16LE(8) };
+  }
+
+  // JPEG: hay que recorrer los segmentos hasta un marcador de inicio de marco.
+  if (b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2;
+    while (i < b.length - 9) {
+      if (b[i] !== 0xff) {
+        i++;
+        continue;
+      }
+
+      const marca = b[i + 1];
+
+      // SOF0..SOF15, saltando los que no describen el marco (DHT, DAA, DRI).
+      const esSof =
+        marca >= 0xc0 && marca <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marca);
+
+      if (esSof) {
+        return { h: b.readUInt16BE(i + 5), w: b.readUInt16BE(i + 7) };
+      }
+
+      i += 2 + b.readUInt16BE(i + 2);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Encaja la imagen dentro del hueco **sin deformarla**.
+ *
+ * Se escala hasta que quepa por el lado que más aprieta, así que el resultado
+ * nunca es mayor que el hueco que se diseñó en Word y conserva la proporción.
+ * Lo que sobra queda en blanco, que es lo correcto para un logo: preferimos
+ * verlo más pequeño que verlo aplastado.
+ */
+function encajar(
+  caja: { cx: number; cy: number },
+  img: { w: number; h: number },
+): { cx: number; cy: number } {
+  if (img.w <= 0 || img.h <= 0) return caja;
+
+  const escala = Math.min(caja.cx / img.w, caja.cy / img.h);
+
+  return {
+    cx: Math.max(1, Math.round(img.w * escala)),
+    cy: Math.max(1, Math.round(img.h * escala)),
+  };
+}
+
 export interface ResultadoInyeccion {
   docx: Buffer;
   /** Etiquetas que sí se sustituyeron. Para poder registrarlo y verlo. */
@@ -194,10 +263,70 @@ export async function inyectarImagenesEnDocx(
        * paso se evita que una edición con soporte de imágenes intente
        * sustituirla otra vez encima de lo que ya se puso aquí.
        */
-      xmls.set(
-        parte,
-        xml.replace(`descr="${etiqueta}"`, `descr="${etiqueta.slice(1, -1)}"`),
+      let xmlFinal = xml.replace(
+        `descr="${etiqueta}"`,
+        `descr="${etiqueta.slice(1, -1)}"`,
       );
+
+      /*
+       * ═══ Ajustar el hueco a la proporción de la imagen ══════════════════
+       *
+       * 🔴 **El hueco tiene tamaño fijo y Word estira lo que se meta dentro.**
+       * El del logo mide 2,40:1; un logo cuadrado salía aplastado a lo ancho y
+       * uno muy apaisado, achatado. La imagen era la correcta — se veía mal.
+       *
+       * Se reescriben los **dos** sitios que llevan el tamaño: `wp:extent`, que
+       * es el hueco en el flujo del documento, y `a:ext`, el del dibujo dentro.
+       * Cambiar solo uno hace que Word y LibreOffice discrepen y la imagen
+       * salga recortada.
+       *
+       * ⚠️ Se acota al **`<w:drawing>` entero**, buscando hacia atrás desde la
+       * etiqueta. No basta con mirar hacia delante: en una imagen flotante
+       * —`wp:anchor`, que es como está el logo en la cabecera— el `wp:extent`
+       * va **antes** del `wp:docPr`, no después. Buscando solo hacia delante no
+       * se encontraba y el ajuste no hacía nada, en silencio.
+       *
+       * Y se acota, en vez de reemplazar en todo el XML, porque el documento
+       * tiene más imágenes y un reemplazo global las redimensionaría todas.
+       */
+      const dim = dimensiones(bytes);
+
+      if (dim) {
+        const posEtiqueta = xmlFinal.indexOf(
+          `descr="${etiqueta.slice(1, -1)}"`,
+        );
+        const iniDibujo = xmlFinal.lastIndexOf('<w:drawing>', posEtiqueta);
+        const finDibujo = xmlFinal.indexOf('</w:drawing>', posEtiqueta);
+
+        if (iniDibujo !== -1 && finDibujo !== -1) {
+          const trozo = xmlFinal.slice(iniDibujo, finDibujo);
+          const caja = /<wp:extent cx="(\d+)" cy="(\d+)"/.exec(trozo);
+
+          if (caja) {
+            const ajustado = encajar(
+              { cx: Number(caja[1]), cy: Number(caja[2]) },
+              dim,
+            );
+
+            const nuevoTrozo = trozo
+              .replace(
+                /<wp:extent cx="\d+" cy="\d+"\/>/,
+                `<wp:extent cx="${ajustado.cx}" cy="${ajustado.cy}"/>`,
+              )
+              .replace(
+                /<a:ext cx="\d+" cy="\d+"\/>/,
+                `<a:ext cx="${ajustado.cx}" cy="${ajustado.cy}"/>`,
+              );
+
+            xmlFinal =
+              xmlFinal.slice(0, iniDibujo) +
+              nuevoTrozo +
+              xmlFinal.slice(finDibujo);
+          }
+        }
+      }
+
+      xmls.set(parte, xmlFinal);
 
       sustituidas.push(etiqueta);
       colocada = true;
