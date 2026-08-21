@@ -45,7 +45,9 @@ export class TenantsService {
       conditions.push(`t.estado = $${params.push(query.estado)}`);
     }
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(' AND ')}`
+      : '';
 
     const result = await this.db.query(
       `SELECT t.id, t.nombre, t.plan, t.estado, t.created_at, t.updated_at,
@@ -67,7 +69,6 @@ export class TenantsService {
       hasMore,
     };
   }
-
 
   async findOne(id: string): Promise<TenantResponseDto> {
     const result = await this.db.query(
@@ -94,15 +95,49 @@ export class TenantsService {
       );
     }
 
-    const result = await this.db.query(
-      `INSERT INTO tenants (nombre, plan, estado)
-       VALUES ($1, $2, $3)
+    const plan = dto.plan ?? planDefault;
+
+    // Sin id explícito: se genera, como siempre.
+    if (!dto.id) {
+      const result = await this.db.query(
+        `INSERT INTO tenants (nombre, plan, estado)
+         VALUES ($1, $2, $3)
+         RETURNING id, nombre, plan, estado, created_at, updated_at`,
+        [dto.nombre, plan, TenantEstado.ACTIVO],
+      );
+
+      this.logger.log(`Tenant creado: ${dto.nombre}`);
+      return this.mapToResponse(result.rows[0]);
+    }
+
+    /*
+     * 🔴 Con id explícito la operación es **idempotente**, y ese es todo su
+     * propósito: dos sistemas del mismo cliente llevan el id como constante y
+     * llaman aquí sin coordinarse. El primero lo crea; el segundo recibe el
+     * que ya existe en vez de un error que tendría que interpretar.
+     *
+     * `ON CONFLICT DO NOTHING` deja la clave primaria arbitrando la carrera:
+     * si los dos llaman a la vez, uno inserta y el otro no, pero ambos acaban
+     * con el mismo tenant. No hace falta bloqueo ni reintento.
+     *
+     * **No actualiza el nombre ni el plan del existente.** Crear no es editar,
+     * y para eso está `PUT /tenants/:id`.
+     */
+    const insert = await this.db.query(
+      `INSERT INTO tenants (id, nombre, plan, estado)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (id) DO NOTHING
        RETURNING id, nombre, plan, estado, created_at, updated_at`,
-      [dto.nombre, dto.plan ?? planDefault, TenantEstado.ACTIVO],
+      [dto.id, dto.nombre, plan, TenantEstado.ACTIVO],
     );
 
-    this.logger.log(`Tenant creado: ${dto.nombre}`);
-    return this.mapToResponse(result.rows[0]);
+    if (insert.rows.length > 0) {
+      this.logger.log(`Tenant creado con id fijo ${dto.id}: ${dto.nombre}`);
+      return this.mapToResponse(insert.rows[0]);
+    }
+
+    this.logger.log(`Tenant ${dto.id} ya existía: se devuelve el existente`);
+    return this.findOne(dto.id);
   }
 
   async update(id: string, dto: UpdateTenantDto): Promise<TenantResponseDto> {
@@ -156,7 +191,11 @@ export class TenantsService {
       false,
     );
 
-    if (!allowDeleteWithEmisores && tenant.emisoresCount && tenant.emisoresCount > 0) {
+    if (
+      !allowDeleteWithEmisores &&
+      tenant.emisoresCount &&
+      tenant.emisoresCount > 0
+    ) {
       throw new ConflictException(
         `No se puede inactivar el tenant: tiene ${tenant.emisoresCount} emisor(es) activo(s). ` +
           `Configure TENANT_ALLOW_DELETE_WITH_EMISORES=true para forzarlo.`,

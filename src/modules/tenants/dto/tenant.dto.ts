@@ -1,4 +1,13 @@
-import { IsString, IsOptional, IsNotEmpty, IsEnum, IsInt, Min, Max, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNotEmpty,
+  IsEnum,
+  IsInt,
+  Min,
+  Max,
+  IsUUID,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 
@@ -33,7 +42,8 @@ export class QueryTenantsDto {
   estado?: TenantEstado;
 
   @ApiPropertyOptional({
-    description: 'Cursor (UUID) para paginación (ID del último tenant obtenido en la página anterior)',
+    description:
+      'Cursor (UUID) para paginación (ID del último tenant obtenido en la página anterior)',
   })
   @IsOptional()
   @IsUUID()
@@ -44,15 +54,39 @@ export class QueryTenantsDto {
     default: 20,
   })
   @IsOptional()
-  @Transform(({ value }) => value !== undefined ? parseInt(String(value), 10) : 20)
+  @Transform(({ value }) =>
+    value !== undefined ? parseInt(String(value), 10) : 20,
+  )
   @IsInt()
   @Min(1)
   @Max(100)
   limit?: number;
 }
 
-
 export class CreateTenantDto {
+  /**
+   * Identificador fijo del tenant, opcional.
+   *
+   * 🔴 **Existe para que dos sistemas del mismo cliente compartan tenant sin
+   * pasarse el id por configuración.** Cada uno lo lleva como constante y
+   * llama aquí: el primero lo crea, el segundo recibe el que ya existe.
+   *
+   * Sin este campo el id lo genera la base, como siempre.
+   *
+   * **Es idempotente solo cuando se manda.** Si ya hay un tenant con ese id,
+   * se devuelve tal cual en vez de fallar — es lo que permite que el
+   * segundo sistema no tenga que distinguir «lo creé yo» de «ya estaba».
+   *
+   * Solo lo puede usar un SUPERADMIN: el controlador entero lo exige.
+   */
+  @ApiPropertyOptional({
+    description:
+      'Id fijo del tenant. Si se omite, se genera. Si ya existe, se devuelve el existente.',
+  })
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   @ApiProperty({ description: 'Nombre del tenant/empresa' })
   @IsString()
   @IsNotEmpty()
@@ -124,10 +158,11 @@ export class PaginatedTenantsResponseDto {
   @ApiProperty({ type: [TenantResponseDto] })
   data: TenantResponseDto[];
 
-  @ApiPropertyOptional({ description: 'Cursor para la siguiente página, null si no hay más' })
+  @ApiPropertyOptional({
+    description: 'Cursor para la siguiente página, null si no hay más',
+  })
   nextCursor: string | null;
 
   @ApiProperty({ description: 'Indica si hay más elementos disponibles' })
   hasMore: boolean;
 }
-
