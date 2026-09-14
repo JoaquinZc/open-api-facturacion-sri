@@ -4,6 +4,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 import { createReadStream } from 'fs';
 import { basename } from 'path';
+import { conCarboneDespierto } from '../../common/utils/carbone-despertar';
 
 /**
  * Supported output formats by Carbone.io
@@ -107,26 +108,31 @@ export class DocumentService {
     }
 
     // 1. Upload template to Carbone
-    const formData = new FormData();
-    const templateStream = createReadStream(templatePath);
-    formData.append('template', templateStream, {
-      filename: basename(templatePath),
-      contentType:
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    });
+    // Formulario y flujo nuevos por intento: un flujo solo se puede leer una vez.
+    const subirPlantilla = () => {
+      const formData = new FormData();
+      const templateStream = createReadStream(templatePath);
+      formData.append('template', templateStream, {
+        filename: basename(templatePath),
+        contentType:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
 
-    const templateResponse = await axios.post(
-      `${this.carboneApi}/template`,
-      formData,
-      {
+      return axios.post(`${this.carboneApi}/template`, formData, {
         headers: {
           ...formData.getHeaders(),
           Accept: 'application/json',
         },
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
-      },
-    );
+      });
+    };
+
+    // La primera llamada es la que despierta a Carbone. Ver `carbone-despertar.ts`.
+    const templateResponse = await conCarboneDespierto(subirPlantilla, {
+      operacion: 'subir la plantilla',
+      logger: this.logger,
+    });
 
     if (
       !templateResponse.data?.success ||

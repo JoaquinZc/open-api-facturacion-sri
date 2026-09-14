@@ -6,6 +6,7 @@ import { readFileSync } from 'fs';
 import { basename, extname } from 'path';
 import { PdfImageService } from './pdf-image.service';
 import { inyectarImagenesEnDocx } from './docx-imagenes';
+import { conCarboneDespierto } from '../../common/utils/carbone-despertar';
 
 export interface ImageData {
   url: string;
@@ -58,7 +59,6 @@ export class PdfService {
     imagenes?: Record<string, Buffer>,
   ): Promise<Buffer> {
     // 1. Upload template to Carbone
-    const formData = new FormData();
     // Buffer y no flujo: es lo que permite calcular `Content-Length` (ver abajo).
     // El tipo va explícito: `readFileSync` devuelve un `Buffer<ArrayBuffer>` y
     // JSZip uno `<ArrayBufferLike>`, que no encajan sin ensancharlo aquí.
@@ -88,46 +88,53 @@ export class PdfService {
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
     };
-    formData.append('template', templateBuffer, {
-      filename: basename(templatePath),
-      contentType: contentTypes[ext] || 'application/octet-stream',
-    });
+    const subirPlantilla = () => {
+      // Un formulario nuevo por intento: el cuerpo se consume al enviarlo.
+      const formData = new FormData();
+      formData.append('template', templateBuffer, {
+        filename: basename(templatePath),
+        contentType: contentTypes[ext] || 'application/octet-stream',
+      });
 
-    /**
-     * **Se manda con `Content-Length`, no troceado.**
-     *
-     * Con un `createReadStream`, `form-data` no puede saber el tamaño por
-     * adelantado y axios envía la petición con `Transfer-Encoding: chunked`.
-     * Carbone la acepta y le asigna un identificador, pero el fichero **no llega
-     * a escribirse**; luego, al verificar el tipo, falla con
-     * `ENOENT: open '/app/template/c_…'` y responde 415 «tipo no soportado» —
-     * un mensaje que apunta al formato de la plantilla cuando el problema es
-     * que no hay plantilla.
-     *
-     * Leerla a memoria permite calcular la longitud. Son unos pocos KB de HTML,
-     * así que el coste es irrelevante frente a que el RIDE no se genere.
-     */
-    const headers: Record<string, string> = {
-      ...formData.getHeaders(),
-      Accept: 'application/json',
-    };
+      /**
+       * **Se manda con `Content-Length`, no troceado.**
+       *
+       * Con un `createReadStream`, `form-data` no puede saber el tamaño por
+       * adelantado y axios envía la petición con `Transfer-Encoding: chunked`.
+       * Carbone la acepta y le asigna un identificador, pero el fichero **no llega
+       * a escribirse**; luego, al verificar el tipo, falla con
+       * `ENOENT: open '/app/template/c_…'` y responde 415 «tipo no soportado» —
+       * un mensaje que apunta al formato de la plantilla cuando el problema es
+       * que no hay plantilla.
+       *
+       * Leerla a memoria permite calcular la longitud. Son unos pocos KB de HTML,
+       * así que el coste es irrelevante frente a que el RIDE no se genere.
+       */
+      const headers: Record<string, string> = {
+        ...formData.getHeaders(),
+        Accept: 'application/json',
+      };
 
-    try {
-      headers['Content-Length'] = String(formData.getLengthSync());
-    } catch {
-      // Solo se puede calcular si todas las partes son buffers o cadenas. Si
-      // alguna fuera un flujo, se envía como antes en vez de romper.
-    }
+      try {
+        headers['Content-Length'] = String(formData.getLengthSync());
+      } catch {
+        // Solo se puede calcular si todas las partes son buffers o cadenas. Si
+        // alguna fuera un flujo, se envía como antes en vez de romper.
+      }
 
-    const templateResponse = await axios.post(
-      `${this.carboneApi}/template`,
-      formData,
-      {
+      return axios.post(`${this.carboneApi}/template`, formData, {
         headers,
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
-      },
-    );
+      });
+    };
+
+    // Es la primera llamada, la que despierta a Carbone si estaba dormido; las
+    // siguientes ya lo encuentran arrancado. Ver `carbone-despertar.ts`.
+    const templateResponse = await conCarboneDespierto(subirPlantilla, {
+      operacion: 'subir la plantilla',
+      logger: this.logger,
+    });
 
     if (
       !templateResponse.data?.success ||

@@ -106,6 +106,37 @@ describe('PdfService', () => {
       expect(axios.get).toHaveBeenCalledTimes(2);
     });
 
+    it('should retry the template upload with a fresh form while Carbone wakes up', async () => {
+      jest.useFakeTimers();
+      try {
+        (axios.post as jest.Mock)
+          .mockRejectedValueOnce({ response: { status: 502 } })
+          .mockResolvedValueOnce({
+            data: { success: true, data: { templateId: 'tpl-123' } },
+          })
+          .mockResolvedValueOnce({
+            data: { success: true, data: { renderId: 'rnd-456' } },
+          });
+        (axios.get as jest.Mock)
+          .mockResolvedValueOnce({ data: { success: true } })
+          .mockResolvedValueOnce({ data: Buffer.from('fake-pdf') });
+
+        const pdf = service.generatePDF(
+          { title: 'Test' },
+          '/fake/templates/report.docx',
+        );
+        await jest.advanceTimersByTimeAsync(1000);
+
+        await expect(pdf).resolves.toBeDefined();
+        expect(axios.post).toHaveBeenCalledTimes(3);
+        // Mismo cuerpo reenviado = cuerpo vacío: cada intento lleva el suyo.
+        const [primero, segundo] = (axios.post as jest.Mock).mock.calls;
+        expect(segundo[1]).not.toBe(primero[1]);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('should throw error when template upload fails', async () => {
       (axios.post as jest.Mock).mockResolvedValueOnce({
         data: { success: false },

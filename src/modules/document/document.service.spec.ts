@@ -31,6 +31,7 @@ jest.mock('../../common/utils/storage-paths', () => ({
 }));
 
 import axios from 'axios';
+import { createReadStream } from 'fs';
 
 describe('DocumentService', () => {
   let service: DocumentService;
@@ -109,6 +110,29 @@ describe('DocumentService', () => {
       await expect(
         service.generateDocument({ title: 'Test' }, '/fake/templates/report.docx', 'xyz'),
       ).rejects.toThrow();
+    });
+
+    it('should retry the template upload with a fresh stream while Carbone wakes up', async () => {
+      jest.useFakeTimers();
+      (createReadStream as jest.Mock).mockClear();
+      try {
+        (axios.post as jest.Mock)
+          .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
+          .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
+          .mockResolvedValueOnce({ data: { success: true, data: { renderId: 'rnd-456' } } });
+        (axios.get as jest.Mock)
+          .mockResolvedValueOnce({ data: { success: true } })
+          .mockResolvedValueOnce({ data: Buffer.from('fake-doc') });
+
+        const doc = service.generateDocument({ title: 'Test' }, '/fake/templates/report.docx', 'pdf');
+        await jest.advanceTimersByTimeAsync(1000);
+
+        await expect(doc).resolves.toBeDefined();
+        // Un flujo solo se lee una vez: el reintento tiene que abrir otro.
+        expect(createReadStream).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('should throw error when template upload fails', async () => {
