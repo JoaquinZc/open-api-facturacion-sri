@@ -32,13 +32,18 @@ export class RealtimeService {
 
   validateToken(token: string): JwtPayload | null {
     try {
-      return this.jwtService.verify<JwtPayload>(token, { secret: this.jwtSecret });
+      return this.jwtService.verify<JwtPayload>(token, {
+        secret: this.jwtSecret,
+      });
     } catch {
       return null;
     }
   }
 
-  createConnection(clientId: string, payload: JwtPayload): Observable<RealtimeEvent> {
+  createConnection(
+    clientId: string,
+    payload: JwtPayload,
+  ): Observable<RealtimeEvent> {
     const subject = new Subject<RealtimeEvent>();
     const connection: ClientConnection = {
       id: clientId,
@@ -47,7 +52,9 @@ export class RealtimeService {
       subject,
     };
     this.connections.set(clientId, connection);
-    this.logger.log(`Cliente SSE conectado: ${clientId} (tenant: ${payload.tenantId}, rol: ${payload.rol})`);
+    this.logger.log(
+      `Cliente SSE conectado: ${clientId} (tenant: ${payload.tenantId}, rol: ${payload.rol})`,
+    );
 
     return new Observable<RealtimeEvent>((subscriber) => {
       const sub = subject.subscribe(subscriber);
@@ -67,9 +74,17 @@ export class RealtimeService {
     }
   }
 
-  private broadcast(event: string, data: Record<string, unknown>, tenantId?: string | null): void {
+  private broadcast(
+    event: string,
+    data: Record<string, unknown>,
+    tenantId?: string | null,
+  ): void {
     for (const conn of this.connections.values()) {
-      if (tenantId && conn.rol !== UserRole.SUPERADMIN && conn.tenantId !== tenantId) {
+      if (
+        tenantId &&
+        conn.rol !== UserRole.SUPERADMIN &&
+        conn.tenantId !== tenantId
+      ) {
         continue;
       }
       conn.subject.next({ event, data });
@@ -78,36 +93,52 @@ export class RealtimeService {
 
   @OnEvent('comprobante.autorizado')
   handleComprobanteAutorizado(payload: any): void {
-    this.broadcast('comprobante.autorizado', {
-      claveAcceso: payload.claveAcceso,
-      estado: payload.estado,
-      tipoComprobante: payload.tipoComprobante,
-    }, payload.tenantId);
+    this.broadcast(
+      'comprobante.autorizado',
+      {
+        claveAcceso: payload.claveAcceso,
+        estado: payload.estado,
+        tipoComprobante: payload.tipoComprobante,
+      },
+      payload.tenantId,
+    );
   }
 
   @OnEvent('comprobante.rechazado')
   handleComprobanteRechazado(payload: any): void {
-    this.broadcast('comprobante.rechazado', {
-      claveAcceso: payload.claveAcceso,
-      estado: payload.estado,
-      tipoComprobante: payload.tipoComprobante,
-    }, payload.tenantId);
+    this.broadcast(
+      'comprobante.rechazado',
+      {
+        claveAcceso: payload.claveAcceso,
+        estado: payload.estado,
+        tipoComprobante: payload.tipoComprobante,
+      },
+      payload.tenantId,
+    );
   }
 
   @OnEvent('comprobante.creado')
   handleComprobanteCreado(payload: any): void {
-    this.broadcast('comprobante.creado', {
-      claveAcceso: payload.claveAcceso,
-      estado: payload.estado,
-      tipoComprobante: payload.tipoComprobante,
-    }, payload.tenantId);
+    this.broadcast(
+      'comprobante.creado',
+      {
+        claveAcceso: payload.claveAcceso,
+        estado: payload.estado,
+        tipoComprobante: payload.tipoComprobante,
+      },
+      payload.tenantId,
+    );
   }
 
   @OnEvent('comprobante.anulado')
   handleComprobanteAnulado(payload: any): void {
-    this.broadcast('comprobante.anulado', {
-      claveAcceso: payload.claveAcceso,
-    }, payload.tenantId);
+    this.broadcast(
+      'comprobante.anulado',
+      {
+        claveAcceso: payload.claveAcceso,
+      },
+      payload.tenantId,
+    );
   }
 
   @OnEvent('comprobante.persistencia_fallida')
@@ -115,11 +146,15 @@ export class RealtimeService {
     this.logger.warn(
       `Persistencia fallida para comprobante ${payload.claveAcceso}`,
     );
-    this.broadcast('comprobante.persistencia_fallida', {
-      claveAcceso: payload.claveAcceso,
-      tipoComprobante: payload.tipoComprobante,
-      emisorRuc: payload.emisorRuc,
-    }, payload.tenantId);
+    this.broadcast(
+      'comprobante.persistencia_fallida',
+      {
+        claveAcceso: payload.claveAcceso,
+        tipoComprobante: payload.tipoComprobante,
+        emisorRuc: payload.emisorRuc,
+      },
+      payload.tenantId,
+    );
   }
 
   @OnEvent('plantilla.creada')

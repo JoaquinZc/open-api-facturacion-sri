@@ -1,5 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { EmisoresController } from './emisores.controller';
 import { EmisoresService } from './emisores.service';
 import {
@@ -102,7 +106,9 @@ describe('EmisoresController', () => {
     });
 
     it('debe listar solo emisores del tenant si el usuario no es SUPERADMIN', async () => {
-      emisoresService.findAllByTenant.mockResolvedValueOnce(mockPaginatedResponse);
+      emisoresService.findAllByTenant.mockResolvedValueOnce(
+        mockPaginatedResponse,
+      );
 
       const result = await controller.findAll(query, tenantUser);
 
@@ -214,13 +220,20 @@ describe('EmisoresController', () => {
         razonSocial: 'Empresa Updated S.A.',
       });
 
-      const result = await controller.update('emisor-uuid-1', updateDto, tenantUser);
+      const result = await controller.update(
+        'emisor-uuid-1',
+        updateDto,
+        tenantUser,
+      );
 
       expect(emisoresService.findOneSecured).toHaveBeenCalledWith(
         'emisor-uuid-1',
         tenantUser,
       );
-      expect(emisoresService.update).toHaveBeenCalledWith('emisor-uuid-1', updateDto);
+      expect(emisoresService.update).toHaveBeenCalledWith(
+        'emisor-uuid-1',
+        updateDto,
+      );
       expect(result.razonSocial).toBe('Empresa Updated S.A.');
     });
 

@@ -74,7 +74,12 @@ describe('RealtimeService', () => {
         rol: UserRole.ADMIN,
         tenantId: 'tenant-2',
       };
-      service.createConnection('client-1', { sub: 'u1', email: 'e', rol: UserRole.USER, tenantId: 't1' });
+      service.createConnection('client-1', {
+        sub: 'u1',
+        email: 'e',
+        rol: UserRole.USER,
+        tenantId: 't1',
+      });
       service.createConnection('client-2', payload);
     });
   });
@@ -177,8 +182,18 @@ describe('RealtimeService', () => {
 
   describe('broadcast filtering', () => {
     it('should only send events to matching tenant', () => {
-      const payload1 = { sub: 'u1', email: 'e1', rol: UserRole.USER, tenantId: 'tenant-1' };
-      const payload2 = { sub: 'u2', email: 'e2', rol: UserRole.USER, tenantId: 'tenant-2' };
+      const payload1 = {
+        sub: 'u1',
+        email: 'e1',
+        rol: UserRole.USER,
+        tenantId: 'tenant-1',
+      };
+      const payload2 = {
+        sub: 'u2',
+        email: 'e2',
+        rol: UserRole.USER,
+        tenantId: 'tenant-2',
+      };
 
       service.createConnection('client-1', payload1);
       service.createConnection('client-2', payload2);
@@ -193,7 +208,12 @@ describe('RealtimeService', () => {
     });
 
     it('should send events to all tenants for SUPERADMIN', () => {
-      const adminPayload = { sub: 'admin', email: 'admin@test.com', rol: UserRole.SUPERADMIN, tenantId: null as any };
+      const adminPayload = {
+        sub: 'admin',
+        email: 'admin@test.com',
+        rol: UserRole.SUPERADMIN,
+        tenantId: null as any,
+      };
       service.createConnection('admin-client', adminPayload);
 
       expect(() =>

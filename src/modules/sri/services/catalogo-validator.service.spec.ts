@@ -9,15 +9,48 @@ describe('CatalogoValidatorService', () => {
   // ── Mock data ─────────────────────────────────────────────────
 
   const mockTarifasRows = [
-    { codigo_porcentaje: '2', descripcion: 'IVA 12%', porcentaje: '12.00', impuesto_codigo: '2', impuesto_nombre: 'IVA' },
-    { codigo_porcentaje: '0', descripcion: 'IVA 0%', porcentaje: '0.00', impuesto_codigo: '2', impuesto_nombre: 'IVA' },
-    { codigo_porcentaje: '5', descripcion: 'IVA 5%', porcentaje: '5.00', impuesto_codigo: '2', impuesto_nombre: 'IVA' },
+    {
+      codigo_porcentaje: '2',
+      descripcion: 'IVA 12%',
+      porcentaje: '12.00',
+      impuesto_codigo: '2',
+      impuesto_nombre: 'IVA',
+    },
+    {
+      codigo_porcentaje: '0',
+      descripcion: 'IVA 0%',
+      porcentaje: '0.00',
+      impuesto_codigo: '2',
+      impuesto_nombre: 'IVA',
+    },
+    {
+      codigo_porcentaje: '5',
+      descripcion: 'IVA 5%',
+      porcentaje: '5.00',
+      impuesto_codigo: '2',
+      impuesto_nombre: 'IVA',
+    },
   ];
 
   const mockRetencionesRows = [
-    { tipo: 'RENTA', codigo: '312', descripcion: 'Servicios profesionales', porcentaje: '1.00' },
-    { tipo: 'IVA', codigo: '701', descripcion: 'Retención IVA 10%', porcentaje: '10.00' },
-    { tipo: 'ISD', codigo: '451', descripcion: 'ISD salida', porcentaje: '2.00' },
+    {
+      tipo: 'RENTA',
+      codigo: '312',
+      descripcion: 'Servicios profesionales',
+      porcentaje: '1.00',
+    },
+    {
+      tipo: 'IVA',
+      codigo: '701',
+      descripcion: 'Retención IVA 10%',
+      porcentaje: '10.00',
+    },
+    {
+      tipo: 'ISD',
+      codigo: '451',
+      descripcion: 'ISD salida',
+      porcentaje: '2.00',
+    },
   ];
 
   const mockFormasPagoRows = [
@@ -27,9 +60,24 @@ describe('CatalogoValidatorService', () => {
   ];
 
   const mockTiposIdentRows = [
-    { codigo: '04', descripcion: 'RUC', longitud: 13, regex_validacion: '^\\d{13}$' },
-    { codigo: '05', descripcion: 'Cédula', longitud: 10, regex_validacion: '^\\d{10}$' },
-    { codigo: '07', descripcion: 'Consumidor Final', longitud: 13, regex_validacion: null },
+    {
+      codigo: '04',
+      descripcion: 'RUC',
+      longitud: 13,
+      regex_validacion: '^\\d{13}$',
+    },
+    {
+      codigo: '05',
+      descripcion: 'Cédula',
+      longitud: 10,
+      regex_validacion: '^\\d{10}$',
+    },
+    {
+      codigo: '07',
+      descripcion: 'Consumidor Final',
+      longitud: 13,
+      regex_validacion: null,
+    },
   ];
 
   const mockDocsSustentoRows = [
@@ -311,7 +359,7 @@ describe('CatalogoValidatorService', () => {
     it('debe retornar tarifas filtradas por codigo de impuesto', async () => {
       const result = await service.getTarifasVigentes('2');
       expect(result).toHaveLength(3);
-      expect(result.every(t => t.impuesto_codigo === '2')).toBe(true);
+      expect(result.every((t) => t.impuesto_codigo === '2')).toBe(true);
     });
 
     it('debe retornar array vacio cuando no hay tarifas para el impuesto', async () => {
@@ -402,7 +450,9 @@ describe('CatalogoValidatorService', () => {
     it('debe propagar error cuando la BD falla', async () => {
       db.query.mockRejectedValueOnce(new Error('DB connection failed'));
 
-      await expect(service.validateImpuesto('2', '2')).rejects.toThrow('DB connection failed');
+      await expect(service.validateImpuesto('2', '2')).rejects.toThrow(
+        'DB connection failed',
+      );
     });
   });
 });

@@ -100,12 +100,20 @@ export class AuthService {
       type: 'access',
     };
 
-    const expiresInConfig = this.configService.get<string>('jwt.expiresIn', '8h');
-    const accessToken = this.jwtService.sign(payload, { expiresIn: expiresInConfig as any });
-    
+    const expiresInConfig = this.configService.get<string>(
+      'jwt.expiresIn',
+      '8h',
+    );
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: expiresInConfig as any,
+    });
+
     // Decodificar para obtener el exp exacto en segundos
     const decodedAccess = this.jwtService.decode(accessToken) as any;
-    const expiresInSeconds = Math.max(0, decodedAccess.exp - Math.floor(Date.now() / 1000));
+    const expiresInSeconds = Math.max(
+      0,
+      decodedAccess.exp - Math.floor(Date.now() / 1000),
+    );
     const expiresAtIso = new Date(decodedAccess.exp * 1000).toISOString();
 
     const refreshPayload: JwtPayload = {
@@ -113,7 +121,9 @@ export class AuthService {
       type: 'refresh',
     };
     // El refresh token suele tener mayor vida, ej. 7 días
-    const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: '7d' });
+    const refreshToken = this.jwtService.sign(refreshPayload, {
+      expiresIn: '7d',
+    });
 
     return {
       accessToken,
@@ -247,7 +257,10 @@ export class AuthService {
   /**
    * Valida un payload JWT y retorna el usuario (usado por JwtStrategy)
    */
-  async validatePayload(payload: JwtPayload, allowRefreshToken = false): Promise<JwtPayload> {
+  async validatePayload(
+    payload: JwtPayload,
+    allowRefreshToken = false,
+  ): Promise<JwtPayload> {
     const user = await this.db.queryOne<{ id: string; activo: boolean }>(
       'SELECT id, activo FROM usuarios WHERE id = $1',
       [payload.sub],
@@ -259,7 +272,9 @@ export class AuthService {
 
     if (payload.type === 'refresh' && !allowRefreshToken) {
       // Las estrategias de autenticación normales (JWT Guard) no deberían aceptar refresh tokens
-      throw new UnauthorizedException('Token de refresco no permitido para acceder a recursos');
+      throw new UnauthorizedException(
+        'Token de refresco no permitido para acceder a recursos',
+      );
     }
 
     return payload;

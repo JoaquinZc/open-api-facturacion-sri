@@ -68,12 +68,18 @@ export class SriService {
    * el SRI vuelve a estar disponible.
    */
 
-  async emitirFactura(dto: CreateFacturaDto): Promise<EmisionEncoladaResponseDto | FacturaResponseDto> {
-    const isAsync = this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
+  async emitirFactura(
+    dto: CreateFacturaDto,
+  ): Promise<EmisionEncoladaResponseDto | FacturaResponseDto> {
+    const isAsync =
+      this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
     if (!isAsync) {
       return this.facturaService.emitirFactura(dto);
     }
-    const job = await this.emisionQueue.add('emision', { tipo: 'FACTURA', dto });
+    const job = await this.emisionQueue.add('emision', {
+      tipo: 'FACTURA',
+      dto,
+    });
     this.logger.log(`Factura encolada con Job ID: ${job.id}`);
     return {
       mensaje: 'Factura encolada para emisión asíncrona',
@@ -101,11 +107,15 @@ export class SriService {
   async emitirNotaCredito(
     dto: CreateNotaCreditoDto,
   ): Promise<EmisionEncoladaResponseDto | NotaCreditoResponseDto> {
-    const isAsync = this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
+    const isAsync =
+      this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
     if (!isAsync) {
       return this.notaCreditoService.emitirNotaCredito(dto);
     }
-    const job = await this.emisionQueue.add('emision', { tipo: 'NOTA_CREDITO', dto });
+    const job = await this.emisionQueue.add('emision', {
+      tipo: 'NOTA_CREDITO',
+      dto,
+    });
     this.logger.log(`Nota de crédito encolada con Job ID: ${job.id}`);
     return {
       mensaje: 'Nota de crédito encolada para emisión asíncrona',
@@ -121,11 +131,15 @@ export class SriService {
   async emitirNotaDebito(
     dto: CreateNotaDebitoDto,
   ): Promise<EmisionEncoladaResponseDto | NotaDebitoResponseDto> {
-    const isAsync = this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
+    const isAsync =
+      this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
     if (!isAsync) {
       return this.notaDebitoService.emitirNotaDebito(dto);
     }
-    const job = await this.emisionQueue.add('emision', { tipo: 'NOTA_DEBITO', dto });
+    const job = await this.emisionQueue.add('emision', {
+      tipo: 'NOTA_DEBITO',
+      dto,
+    });
     this.logger.log(`Nota de débito encolada con Job ID: ${job.id}`);
     return {
       mensaje: 'Nota de débito encolada para emisión asíncrona',
@@ -141,11 +155,15 @@ export class SriService {
   async emitirRetencion(
     dto: CreateRetencionDto,
   ): Promise<EmisionEncoladaResponseDto | RetencionResponseDto> {
-    const isAsync = this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
+    const isAsync =
+      this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
     if (!isAsync) {
       return this.retencionService.emitirRetencion(dto);
     }
-    const job = await this.emisionQueue.add('emision', { tipo: 'RETENCION', dto });
+    const job = await this.emisionQueue.add('emision', {
+      tipo: 'RETENCION',
+      dto,
+    });
     this.logger.log(`Retención encolada con Job ID: ${job.id}`);
     return {
       mensaje: 'Retención encolada para emisión asíncrona',
@@ -161,11 +179,15 @@ export class SriService {
   async emitirGuiaRemision(
     dto: CreateGuiaRemisionDto,
   ): Promise<EmisionEncoladaResponseDto | GuiaRemisionResponseDto> {
-    const isAsync = this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
+    const isAsync =
+      this.configService.get<string>('SRI_EMISION_ASYNC') !== 'false';
     if (!isAsync) {
       return this.guiaRemisionService.emitirGuiaRemision(dto);
     }
-    const job = await this.emisionQueue.add('emision', { tipo: 'GUIA_REMISION', dto });
+    const job = await this.emisionQueue.add('emision', {
+      tipo: 'GUIA_REMISION',
+      dto,
+    });
     this.logger.log(`Guía de remisión encolada con Job ID: ${job.id}`);
     return {
       mensaje: 'Guía de remisión encolada para emisión asíncrona',
@@ -349,7 +371,12 @@ export class SriService {
       ).toString('base64');
     }
 
-    const meta: { total?: number; page: number; limit: number; totalPages?: number } = {
+    const meta: {
+      total?: number;
+      page: number;
+      limit: number;
+      totalPages?: number;
+    } = {
       page,
       limit,
     };
@@ -496,7 +523,10 @@ export class SriService {
       fechaEmision.getFullYear(),
       fechaEmision.getMonth() + 1,
       7,
-      23, 59, 59, 999,
+      23,
+      59,
+      59,
+      999,
     );
 
     if (ahora > dia7MesSiguiente) {
@@ -812,7 +842,10 @@ export class SriService {
       }
 
       // Rate limiting configurable para evitar baneos de IP del SRI
-      const delayMs = this.configService.get<number>('SRI_REQUEST_DELAY_MS', 150);
+      const delayMs = this.configService.get<number>(
+        'SRI_REQUEST_DELAY_MS',
+        150,
+      );
       let syncProcessed = 0;
 
       for (const comp of comprobantes) {
@@ -860,8 +893,8 @@ export class SriService {
                 await this.repository.saveXml({
                   comprobante_id: comp.id as string,
                   xml_autorizado_path: autorizado.path,
-        // Con valor solo si la subida falló; ver XmlStorageService.
-        xml_autorizado_contenido: autorizado.contenido,
+                  // Con valor solo si la subida falló; ver XmlStorageService.
+                  xml_autorizado_contenido: autorizado.contenido,
                 });
               }
 
@@ -1047,7 +1080,8 @@ export class SriService {
       id: solicitud.id,
       claveAcceso,
       estado: solicitud.estado,
-      mensaje: 'Solicitud de anulación creada. El receptor tiene 5 días hábiles para responder.',
+      mensaje:
+        'Solicitud de anulación creada. El receptor tiene 5 días hábiles para responder.',
     };
   }
 
@@ -1070,7 +1104,9 @@ export class SriService {
     );
 
     if (result.rows.length === 0) {
-      throw new BadRequestException(`Solicitud de anulación ${solicitudId} no encontrada`);
+      throw new BadRequestException(
+        `Solicitud de anulación ${solicitudId} no encontrada`,
+      );
     }
 
     const solicitud = result.rows[0];
@@ -1196,9 +1232,7 @@ export class SriService {
    * Anula múltiples comprobantes en lote.
    * Aplica las mismas validaciones que anularComprobante individualmente.
    */
-  async anularMasivamente(
-    clavesAcceso: string[],
-  ): Promise<{
+  async anularMasivamente(clavesAcceso: string[]): Promise<{
     procesados: number;
     anulados: number;
     errores: number;
@@ -1208,7 +1242,11 @@ export class SriService {
     let procesados = 0;
     let anulados = 0;
     let errores = 0;
-    const detalle: Array<{ claveAcceso: string; estado: string; error?: string }> = [];
+    const detalle: Array<{
+      claveAcceso: string;
+      estado: string;
+      error?: string;
+    }> = [];
 
     for (let i = 0; i < clavesAcceso.length; i += BATCH_SIZE) {
       const batch = clavesAcceso.slice(i, i + BATCH_SIZE);

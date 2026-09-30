@@ -20,10 +20,10 @@ export class RedisHealthIndicator extends HealthIndicator {
 
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     const client = new Redis({
-      host:     this.configService.getOrThrow<string>('redis.host'),
-      port:     this.configService.getOrThrow<number>('redis.port'),
+      host: this.configService.getOrThrow<string>('redis.host'),
+      port: this.configService.getOrThrow<number>('redis.port'),
       password: this.configService.get<string>('redis.password') || undefined,
-      db:       this.configService.getOrThrow<number>('redis.db'),
+      db: this.configService.getOrThrow<number>('redis.db'),
       lazyConnect: true,
       connectTimeout: 5000,
       maxRetriesPerRequest: 1,

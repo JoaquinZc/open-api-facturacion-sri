@@ -132,7 +132,9 @@ describe('CertificateService', () => {
     it('should create directory when it does not exist', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(false);
       service.ensureCertificateDirectory();
-      expect(fs.mkdirSync).toHaveBeenCalledWith(mockCertsDir, { recursive: true });
+      expect(fs.mkdirSync).toHaveBeenCalledWith(mockCertsDir, {
+        recursive: true,
+      });
     });
 
     it('should not create directory when it already exists', () => {
@@ -145,7 +147,11 @@ describe('CertificateService', () => {
   describe('listCertificates', () => {
     it('should return all certificates without pagination', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (fs.readdirSync as jest.Mock).mockReturnValue(['cert1.p12', 'cert2.p12', 'readme.txt']);
+      (fs.readdirSync as jest.Mock).mockReturnValue([
+        'cert1.p12',
+        'cert2.p12',
+        'readme.txt',
+      ]);
       (fs.statSync as jest.Mock).mockImplementation(() => ({
         size: 1024,
         birthtime: new Date('2026-01-01'),
@@ -172,7 +178,11 @@ describe('CertificateService', () => {
     it('should apply pagination when options provided', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
       (fs.readdirSync as jest.Mock).mockReturnValue([
-        'a.p12', 'b.p12', 'c.p12', 'd.p12', 'e.p12',
+        'a.p12',
+        'b.p12',
+        'c.p12',
+        'd.p12',
+        'e.p12',
       ]);
       (fs.statSync as jest.Mock).mockImplementation(() => ({
         size: 100,
@@ -223,7 +233,9 @@ describe('CertificateService', () => {
     });
 
     it('should throw BadRequestException for non-p12 filename', () => {
-      expect(() => service.deleteCertificate('cert.txt')).toThrow(BadRequestException);
+      expect(() => service.deleteCertificate('cert.txt')).toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException for empty filename', () => {
@@ -232,7 +244,9 @@ describe('CertificateService', () => {
 
     it('should throw NotFoundException when certificate does not exist', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(false);
-      expect(() => service.deleteCertificate('missing.p12')).toThrow(NotFoundException);
+      expect(() => service.deleteCertificate('missing.p12')).toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -254,21 +268,28 @@ describe('CertificateService', () => {
 
     it('should throw NotFoundException when file does not exist', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(false);
-      expect(() => service.getCertificateInfo('missing.p12')).toThrow(NotFoundException);
+      expect(() => service.getCertificateInfo('missing.p12')).toThrow(
+        NotFoundException,
+      );
     });
   });
 
   describe('extractP12CertificateInfo', () => {
     it('should throw NotFoundException when certificate file does not exist', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(false);
-      expect(() => service.extractP12CertificateInfo('missing.p12', 'pass')).toThrow(NotFoundException);
+      expect(() =>
+        service.extractP12CertificateInfo('missing.p12', 'pass'),
+      ).toThrow(NotFoundException);
     });
 
     it('should extract certificate info from P12 buffer', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
       (fs.readFileSync as jest.Mock).mockReturnValue(Buffer.from('fake-p12'));
 
-      const result = service.extractP12CertificateInfo('cert.p12', 'password123');
+      const result = service.extractP12CertificateInfo(
+        'cert.p12',
+        'password123',
+      );
 
       expect(result.subject.commonName).toBe('Test CN');
       expect(result.subject.organization).toBe('Test Org');
@@ -281,7 +302,10 @@ describe('CertificateService', () => {
 
   describe('extractCertInfoFromBuffer', () => {
     it('should extract info from a valid P12 buffer', () => {
-      const result = service.extractCertInfoFromBuffer(Buffer.from('fake'), 'pass');
+      const result = service.extractCertInfoFromBuffer(
+        Buffer.from('fake'),
+        'pass',
+      );
 
       expect(result.subject).toBeDefined();
       expect(result.issuer).toBeDefined();

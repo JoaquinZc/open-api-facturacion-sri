@@ -21,14 +21,21 @@ export enum TipoRetencion {
 
 export class CreateRetencionDto {
   @ApiProperty({ description: 'Tipo de retención', enum: TipoRetencion })
-  @IsEnum(TipoRetencion, { message: `tipo debe ser uno de: ${Object.values(TipoRetencion).join(', ')}` })
+  @IsEnum(TipoRetencion, {
+    message: `tipo debe ser uno de: ${Object.values(TipoRetencion).join(', ')}`,
+  })
   tipo: TipoRetencion;
 
-  @ApiProperty({ description: 'Código de retención (1-10 caracteres)', example: '312' })
+  @ApiProperty({
+    description: 'Código de retención (1-10 caracteres)',
+    example: '312',
+  })
   @IsString()
   @IsNotEmpty()
   @Length(1, 10)
-  @Matches(/^[A-Za-z0-9]+$/, { message: 'El código solo puede contener letras y números' })
+  @Matches(/^[A-Za-z0-9]+$/, {
+    message: 'El código solo puede contener letras y números',
+  })
   codigo: string;
 
   @ApiProperty({ description: 'Descripción de la retención' })
@@ -43,17 +50,25 @@ export class CreateRetencionDto {
   @Max(100)
   porcentaje: number;
 
-  @ApiPropertyOptional({ description: 'Fecha desde la que es vigente (YYYY-MM-DD)', example: '2026-03-01' })
+  @ApiPropertyOptional({
+    description: 'Fecha desde la que es vigente (YYYY-MM-DD)',
+    example: '2026-03-01',
+  })
   @IsOptional()
   @IsDateString()
   vigenteDesde?: string;
 
-  @ApiPropertyOptional({ description: 'Fecha hasta la que es vigente (YYYY-MM-DD)' })
+  @ApiPropertyOptional({
+    description: 'Fecha hasta la que es vigente (YYYY-MM-DD)',
+  })
   @IsOptional()
   @IsDateString()
   vigenteHasta?: string;
 
-  @ApiPropertyOptional({ description: 'Si el código está activo', default: true })
+  @ApiPropertyOptional({
+    description: 'Si el código está activo',
+    default: true,
+  })
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
@@ -74,12 +89,16 @@ export class UpdateRetencionDto {
   @Max(100)
   porcentaje?: number;
 
-  @ApiPropertyOptional({ description: 'Fecha desde la que es vigente (YYYY-MM-DD)' })
+  @ApiPropertyOptional({
+    description: 'Fecha desde la que es vigente (YYYY-MM-DD)',
+  })
   @IsOptional()
   @IsDateString()
   vigenteDesde?: string;
 
-  @ApiPropertyOptional({ description: 'Fecha hasta la que es vigente (YYYY-MM-DD)' })
+  @ApiPropertyOptional({
+    description: 'Fecha hasta la que es vigente (YYYY-MM-DD)',
+  })
   @IsOptional()
   @IsDateString()
   vigenteHasta?: string;

@@ -94,12 +94,14 @@ export class SriController {
   @ApiBody({ type: CreateFacturaDto })
   @ApiResponse({
     status: 201,
-    description: 'Factura encolada para procesamiento asíncrono (según configuración del servidor)',
+    description:
+      'Factura encolada para procesamiento asíncrono (según configuración del servidor)',
     type: EmisionEncoladaResponseDto,
   })
   @ApiResponse({
     status: 200,
-    description: 'Factura procesada sincronamente (según configuración del servidor)',
+    description:
+      'Factura procesada sincronamente (según configuración del servidor)',
     type: FacturaResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
@@ -122,12 +124,14 @@ export class SriController {
   @ApiBody({ type: CreateNotaCreditoDto })
   @ApiResponse({
     status: 201,
-    description: 'Nota de crédito encolada para procesamiento asíncrono (según configuración)',
+    description:
+      'Nota de crédito encolada para procesamiento asíncrono (según configuración)',
     type: EmisionEncoladaResponseDto,
   })
   @ApiResponse({
     status: 200,
-    description: 'Nota de crédito procesada sincronamente (según configuración)',
+    description:
+      'Nota de crédito procesada sincronamente (según configuración)',
     type: NotaCreditoResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
@@ -149,7 +153,8 @@ export class SriController {
   @ApiBody({ type: CreateNotaDebitoDto })
   @ApiResponse({
     status: 201,
-    description: 'Nota de débito encolada para procesamiento asíncrono (según configuración)',
+    description:
+      'Nota de débito encolada para procesamiento asíncrono (según configuración)',
     type: EmisionEncoladaResponseDto,
   })
   @ApiResponse({
@@ -176,7 +181,8 @@ export class SriController {
   @ApiBody({ type: CreateRetencionDto })
   @ApiResponse({
     status: 201,
-    description: 'Retención encolada para procesamiento asíncrono (según configuración)',
+    description:
+      'Retención encolada para procesamiento asíncrono (según configuración)',
     type: EmisionEncoladaResponseDto,
   })
   @ApiResponse({
@@ -203,12 +209,14 @@ export class SriController {
   @ApiBody({ type: CreateGuiaRemisionDto })
   @ApiResponse({
     status: 201,
-    description: 'Guía de remisión encolada para procesamiento asíncrono (según configuración)',
+    description:
+      'Guía de remisión encolada para procesamiento asíncrono (según configuración)',
     type: EmisionEncoladaResponseDto,
   })
   @ApiResponse({
     status: 200,
-    description: 'Guía de remisión procesada sincronamente (según configuración)',
+    description:
+      'Guía de remisión procesada sincronamente (según configuración)',
     type: GuiaRemisionResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
@@ -438,7 +446,8 @@ export class SriController {
   @Get('comprobantes/:claveAcceso/ride')
   @ApiOperation({
     summary: 'Descargar RIDE (PDF) del comprobante',
-    description: 'Genera y descarga el RIDE (Representaciin Impresa del Documento Electrnico) en PDF',
+    description:
+      'Genera y descarga el RIDE (Representaciin Impresa del Documento Electrnico) en PDF',
   })
   @ApiParam({
     name: 'claveAcceso',
@@ -635,15 +644,28 @@ export class SriController {
     description:
       'Crea una solicitud de anulación para retenciones, NC o ND. El receptor tiene 5 días hábiles para responder.',
   })
-  @ApiParam({ name: 'claveAcceso', description: 'Clave de acceso de 49 dígitos' })
+  @ApiParam({
+    name: 'claveAcceso',
+    description: 'Clave de acceso de 49 dígitos',
+  })
   @ApiResponse({ status: 201, description: 'Solicitud creada' })
-  @ApiResponse({ status: 400, description: 'El comprobante no requiere aceptación o no se puede anular' })
+  @ApiResponse({
+    status: 400,
+    description: 'El comprobante no requiere aceptación o no se puede anular',
+  })
   async crearSolicitudAnulacion(
     @Param('claveAcceso') claveAcceso: string,
     @Body() body: { motivo?: string },
     @CurrentUser() user: JwtPayload,
-  ): Promise<{ id: string; claveAcceso: string; estado: string; mensaje: string }> {
-    this.logger.log(`POST /sri/comprobantes/${claveAcceso}/solicitud-anulacion`);
+  ): Promise<{
+    id: string;
+    claveAcceso: string;
+    estado: string;
+    mensaje: string;
+  }> {
+    this.logger.log(
+      `POST /sri/comprobantes/${claveAcceso}/solicitud-anulacion`,
+    );
     await this.validateClaveAccesoAccess(claveAcceso, user);
     return this.sriService.crearSolicitudAnulacion(claveAcceso, body.motivo);
   }
@@ -654,15 +676,30 @@ export class SriController {
     summary: 'Responder solicitud de anulación (aceptar/rechazar)',
     description: 'El receptor acepta o rechaza una solicitud de anulación.',
   })
-  @ApiParam({ name: 'solicitudId', description: 'ID de la solicitud de anulación' })
+  @ApiParam({
+    name: 'solicitudId',
+    description: 'ID de la solicitud de anulación',
+  })
   @ApiResponse({ status: 200, description: 'Respuesta registrada' })
-  @ApiResponse({ status: 400, description: 'La solicitud ya fue respondida o expiró' })
+  @ApiResponse({
+    status: 400,
+    description: 'La solicitud ya fue respondida o expiró',
+  })
   async responderSolicitudAnulacion(
     @Param('solicitudId') solicitudId: string,
     @Body() dto: RespuestaAnulacionDto,
-  ): Promise<{ solicitudId: string; claveAcceso: string; estado: string; mensaje: string }> {
+  ): Promise<{
+    solicitudId: string;
+    claveAcceso: string;
+    estado: string;
+    mensaje: string;
+  }> {
     this.logger.log(`POST /sri/anulaciones/${solicitudId}/responder`);
-    return this.sriService.responderSolicitudAnulacion(solicitudId, dto.respuesta, dto.motivo);
+    return this.sriService.responderSolicitudAnulacion(
+      solicitudId,
+      dto.respuesta,
+      dto.motivo,
+    );
   }
 
   @Get('anulaciones/:solicitudId')
@@ -670,7 +707,10 @@ export class SriController {
     summary: 'Consultar estado de solicitud de anulación',
     description: 'Consulta el estado de una solicitud de anulación.',
   })
-  @ApiParam({ name: 'solicitudId', description: 'ID de la solicitud de anulación' })
+  @ApiParam({
+    name: 'solicitudId',
+    description: 'ID de la solicitud de anulación',
+  })
   @ApiResponse({ status: 200, description: 'Estado de la solicitud' })
   @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
   async consultarSolicitudAnulacion(
@@ -713,9 +753,13 @@ export class SriController {
     errores: number;
     detalle: Array<{ claveAcceso: string; estado: string; error?: string }>;
   }> {
-    this.logger.log(`POST /sri/comprobantes/anulacion-masiva - ${body.clavesAcceso.length} comprobantes`);
+    this.logger.log(
+      `POST /sri/comprobantes/anulacion-masiva - ${body.clavesAcceso.length} comprobantes`,
+    );
     if (user.rol !== UserRole.SUPERADMIN) {
-      throw new ForbiddenException('La anulación masiva requiere rol SUPERADMIN');
+      throw new ForbiddenException(
+        'La anulación masiva requiere rol SUPERADMIN',
+      );
     }
     return this.sriService.anularMasivamente(body.clavesAcceso);
   }

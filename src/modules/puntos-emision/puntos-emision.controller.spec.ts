@@ -1,5 +1,10 @@
 import { Test } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PuntosEmisionController } from './puntos-emision.controller';
 import { PuntosEmisionService } from './puntos-emision.service';
 import { EmisoresService } from '../emisores/emisores.service';
@@ -108,13 +113,20 @@ describe('PuntosEmisionController', () => {
       emisoresService.validateEmisorAccess.mockResolvedValueOnce({} as any);
       service.findOne.mockResolvedValueOnce(mockPuntoResponse);
 
-      const result = await controller.findOne('emisor-uuid-1', 'pe-uuid-1', superadminUser);
+      const result = await controller.findOne(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+        superadminUser,
+      );
 
       expect(emisoresService.validateEmisorAccess).toHaveBeenCalledWith(
         'emisor-uuid-1',
         superadminUser,
       );
-      expect(service.findOne).toHaveBeenCalledWith('emisor-uuid-1', 'pe-uuid-1');
+      expect(service.findOne).toHaveBeenCalledWith(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+      );
       expect(result.id).toBe('pe-uuid-1');
     });
 
@@ -144,7 +156,11 @@ describe('PuntosEmisionController', () => {
       emisoresService.validateEmisorAccess.mockResolvedValueOnce({} as any);
       service.create.mockResolvedValueOnce(mockPuntoResponse);
 
-      const result = await controller.create('emisor-uuid-1', createDto, tenantUser);
+      const result = await controller.create(
+        'emisor-uuid-1',
+        createDto,
+        tenantUser,
+      );
 
       expect(emisoresService.validateEmisorAccess).toHaveBeenCalledWith(
         'emisor-uuid-1',
@@ -187,15 +203,27 @@ describe('PuntosEmisionController', () => {
 
     it('debe actualizar un punto después de validar acceso', async () => {
       emisoresService.validateEmisorAccess.mockResolvedValueOnce({} as any);
-      service.update.mockResolvedValueOnce({ ...mockPuntoResponse, descripcion: 'Caja Actualizada' });
+      service.update.mockResolvedValueOnce({
+        ...mockPuntoResponse,
+        descripcion: 'Caja Actualizada',
+      });
 
-      const result = await controller.update('emisor-uuid-1', 'pe-uuid-1', updateDto, tenantUser);
+      const result = await controller.update(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+        updateDto,
+        tenantUser,
+      );
 
       expect(emisoresService.validateEmisorAccess).toHaveBeenCalledWith(
         'emisor-uuid-1',
         tenantUser,
       );
-      expect(service.update).toHaveBeenCalledWith('emisor-uuid-1', 'pe-uuid-1', updateDto);
+      expect(service.update).toHaveBeenCalledWith(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+        updateDto,
+      );
       expect(result.descripcion).toBe('Caja Actualizada');
     });
 
@@ -206,7 +234,12 @@ describe('PuntosEmisionController', () => {
       );
 
       await expect(
-        controller.update('emisor-uuid-1', 'non-existent', updateDto, superadminUser),
+        controller.update(
+          'emisor-uuid-1',
+          'non-existent',
+          updateDto,
+          superadminUser,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -216,9 +249,16 @@ describe('PuntosEmisionController', () => {
   describe('DELETE /emisores/puntos-emision/:emisorId/:puntoEmisionId', () => {
     it('debe inactivar un punto después de validar acceso', async () => {
       emisoresService.validateEmisorAccess.mockResolvedValueOnce({} as any);
-      service.delete.mockResolvedValueOnce({ ...mockPuntoResponse, estado: 'INACTIVO' });
+      service.delete.mockResolvedValueOnce({
+        ...mockPuntoResponse,
+        estado: 'INACTIVO',
+      });
 
-      const result = await controller.delete('emisor-uuid-1', 'pe-uuid-1', tenantUser);
+      const result = await controller.delete(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+        tenantUser,
+      );
 
       expect(emisoresService.validateEmisorAccess).toHaveBeenCalledWith(
         'emisor-uuid-1',

@@ -31,7 +31,9 @@ describe('XmlBuilderService', () => {
 
   // ── Fixtures ──────────────────────────────────────────────────
 
-  function createInfoTributaria(overrides?: Partial<InfoTributaria>): InfoTributaria {
+  function createInfoTributaria(
+    overrides?: Partial<InfoTributaria>,
+  ): InfoTributaria {
     return {
       ambiente: Ambiente.PRUEBAS,
       tipoEmision: TipoEmision.NORMAL,
@@ -61,12 +63,21 @@ describe('XmlBuilderService', () => {
         totalSinImpuestos: 100.0,
         totalDescuento: 0.0,
         totalConImpuestos: [
-          { codigo: '2', codigoPorcentaje: '2', baseImponible: 100.0, tarifa: 12.0, valor: 12.0 },
+          {
+            codigo: '2',
+            codigoPorcentaje: '2',
+            baseImponible: 100.0,
+            tarifa: 12.0,
+            valor: 12.0,
+          },
         ],
         importeTotal: 112.0,
         moneda: 'USD',
         pagos: [
-          { formaPago: FormaPago.SIN_UTILIZACION_SISTEMA_FINANCIERO, total: 112.0 },
+          {
+            formaPago: FormaPago.SIN_UTILIZACION_SISTEMA_FINANCIERO,
+            total: 112.0,
+          },
         ],
       },
       detalles: [
@@ -80,7 +91,13 @@ describe('XmlBuilderService', () => {
           descuento: 0.0,
           precioTotalSinImpuesto: 100.0,
           impuestos: [
-            { codigo: '2', codigoPorcentaje: '2', tarifa: 12.0, baseImponible: 100.0, valor: 12.0 },
+            {
+              codigo: '2',
+              codigoPorcentaje: '2',
+              tarifa: 12.0,
+              baseImponible: 100.0,
+              valor: 12.0,
+            },
           ],
         },
       ],
@@ -108,7 +125,12 @@ describe('XmlBuilderService', () => {
         valorModificacion: 112.0,
         moneda: 'USD',
         totalConImpuestos: [
-          { codigo: '2', codigoPorcentaje: '2', baseImponible: 100.0, valor: 12.0 },
+          {
+            codigo: '2',
+            codigoPorcentaje: '2',
+            baseImponible: 100.0,
+            valor: 12.0,
+          },
         ],
         motivo: 'Devolución de producto',
       },
@@ -121,7 +143,13 @@ describe('XmlBuilderService', () => {
           descuento: 0.0,
           precioTotalSinImpuesto: 100.0,
           impuestos: [
-            { codigo: '2', codigoPorcentaje: '2', tarifa: 12.0, baseImponible: 100.0, valor: 12.0 },
+            {
+              codigo: '2',
+              codigoPorcentaje: '2',
+              tarifa: 12.0,
+              baseImponible: 100.0,
+              valor: 12.0,
+            },
           ],
         },
       ],
@@ -146,13 +174,17 @@ describe('XmlBuilderService', () => {
         fechaEmisionDocSustento: '01/02/2026',
         totalSinImpuestos: 100.0,
         impuestos: [
-          { codigo: '2', codigoPorcentaje: '2', baseImponible: 100.0, tarifa: 12.0, valor: 12.0 },
+          {
+            codigo: '2',
+            codigoPorcentaje: '2',
+            baseImponible: 100.0,
+            tarifa: 12.0,
+            valor: 12.0,
+          },
         ],
         valorTotal: 112.0,
       },
-      motivos: [
-        { razon: 'Interés por mora', valor: 12.0 },
-      ],
+      motivos: [{ razon: 'Interés por mora', valor: 12.0 }],
     };
   }
 
@@ -187,7 +219,13 @@ describe('XmlBuilderService', () => {
           pagoLocExt: '01',
           formaPago: '01',
           impuestosDocSustento: [
-            { codImpuestoDocSustento: '2', codigoPorcentaje: '2', baseImponible: 1000.0, tarifa: 12.0, valorImpuesto: 120.0 },
+            {
+              codImpuestoDocSustento: '2',
+              codigoPorcentaje: '2',
+              baseImponible: 1000.0,
+              tarifa: 12.0,
+              valorImpuesto: 120.0,
+            },
           ],
         },
       ],
@@ -219,7 +257,11 @@ describe('XmlBuilderService', () => {
           dirDestinatario: 'Av. Eloy Alfaro 456, Guayaquil',
           motivoTraslado: '01',
           detalles: [
-            { codigoInterno: 'PROD001', descripcion: 'Producto transportado', cantidad: 10 },
+            {
+              codigoInterno: 'PROD001',
+              descripcion: 'Producto transportado',
+              cantidad: 10,
+            },
           ],
         },
       ],
@@ -273,16 +315,24 @@ describe('XmlBuilderService', () => {
       const factura = createFactura();
       factura.infoTributaria.contribuyenteRimpe = 'CONTRIBUYENTE RÉGIMEN RIMPE';
       const xml = service.buildFactura(factura);
-      expect(xml).toContain('<contribuyenteRimpe>CONTRIBUYENTE RÉGIMEN RIMPE</contribuyenteRimpe>');
+      expect(xml).toContain(
+        '<contribuyenteRimpe>CONTRIBUYENTE RÉGIMEN RIMPE</contribuyenteRimpe>',
+      );
     });
 
     it('debe incluir infoFactura con campos obligatorios', () => {
       const xml = service.buildFactura(createFactura());
       expect(xml).toContain('<fechaEmision>07/02/2026</fechaEmision>');
       expect(xml).toContain('<obligadoContabilidad>SI</obligadoContabilidad>');
-      expect(xml).toContain('<tipoIdentificacionComprador>05</tipoIdentificacionComprador>');
-      expect(xml).toContain('<razonSocialComprador>Juan Pérez</razonSocialComprador>');
-      expect(xml).toContain('<identificacionComprador>1710034065</identificacionComprador>');
+      expect(xml).toContain(
+        '<tipoIdentificacionComprador>05</tipoIdentificacionComprador>',
+      );
+      expect(xml).toContain(
+        '<razonSocialComprador>Juan Pérez</razonSocialComprador>',
+      );
+      expect(xml).toContain(
+        '<identificacionComprador>1710034065</identificacionComprador>',
+      );
     });
 
     it('debe formatear decimales con 2 posiciones para totales', () => {
@@ -329,7 +379,9 @@ describe('XmlBuilderService', () => {
       const factura = createFactura();
       factura.infoFactura.direccionComprador = 'Av. Eloy Alfaro 456';
       const xml = service.buildFactura(factura);
-      expect(xml).toContain('<direccionComprador>Av. Eloy Alfaro 456</direccionComprador>');
+      expect(xml).toContain(
+        '<direccionComprador>Av. Eloy Alfaro 456</direccionComprador>',
+      );
     });
 
     it('debe incluir propina cuando se proporciona', () => {
@@ -374,9 +426,7 @@ describe('XmlBuilderService', () => {
 
     it('debe incluir infoAdicional cuando se proporciona', () => {
       const factura = createFactura();
-      factura.infoAdicional = [
-        { nombre: 'email', valor: 'juan@test.com' },
-      ];
+      factura.infoAdicional = [{ nombre: 'email', valor: 'juan@test.com' }];
       const xml = service.buildFactura(factura);
       expect(xml).toContain('<infoAdicional>');
       expect(xml).toContain('nombre="email"');
@@ -387,7 +437,9 @@ describe('XmlBuilderService', () => {
       const factura = createFactura();
       factura.infoFactura.contribuyenteEspecial = '12345';
       const xml = service.buildFactura(factura);
-      expect(xml).toContain('<contribuyenteEspecial>12345</contribuyenteEspecial>');
+      expect(xml).toContain(
+        '<contribuyenteEspecial>12345</contribuyenteEspecial>',
+      );
     });
 
     it('debe incluir guiaRemision cuando se proporciona', () => {
@@ -411,8 +463,12 @@ describe('XmlBuilderService', () => {
       const xml = service.buildNotaCredito(createNotaCredito());
       expect(xml).toContain('<fechaEmision>07/02/2026</fechaEmision>');
       expect(xml).toContain('<codDocModificado>01</codDocModificado>');
-      expect(xml).toContain('<numDocModificado>001-001-000000001</numDocModificado>');
-      expect(xml).toContain('<fechaEmisionDocSustento>01/02/2026</fechaEmisionDocSustento>');
+      expect(xml).toContain(
+        '<numDocModificado>001-001-000000001</numDocModificado>',
+      );
+      expect(xml).toContain(
+        '<fechaEmisionDocSustento>01/02/2026</fechaEmisionDocSustento>',
+      );
       expect(xml).toContain('<motivo>Devolución de producto</motivo>');
     });
 
@@ -455,7 +511,9 @@ describe('XmlBuilderService', () => {
       const xml = service.buildNotaDebito(createNotaDebito());
       expect(xml).toContain('<fechaEmision>07/02/2026</fechaEmision>');
       expect(xml).toContain('<codDocModificado>01</codDocModificado>');
-      expect(xml).toContain('<numDocModificado>001-001-000000001</numDocModificado>');
+      expect(xml).toContain(
+        '<numDocModificado>001-001-000000001</numDocModificado>',
+      );
       expect(xml).toContain('<valorTotal>112.00</valorTotal>');
     });
 
@@ -495,9 +553,15 @@ describe('XmlBuilderService', () => {
     it('debe incluir infoCompRetencion con campos obligatorios', () => {
       const xml = service.buildRetencion(createRetencion());
       expect(xml).toContain('<fechaEmision>07/02/2026</fechaEmision>');
-      expect(xml).toContain('<tipoIdentificacionSujetoRetenido>04</tipoIdentificacionSujetoRetenido>');
-      expect(xml).toContain('<razonSocialSujetoRetenido>Proveedor S.A.</razonSocialSujetoRetenido>');
-      expect(xml).toContain('<identificacionSujetoRetenido>0991234567001</identificacionSujetoRetenido>');
+      expect(xml).toContain(
+        '<tipoIdentificacionSujetoRetenido>04</tipoIdentificacionSujetoRetenido>',
+      );
+      expect(xml).toContain(
+        '<razonSocialSujetoRetenido>Proveedor S.A.</razonSocialSujetoRetenido>',
+      );
+      expect(xml).toContain(
+        '<identificacionSujetoRetenido>0991234567001</identificacionSujetoRetenido>',
+      );
       expect(xml).toContain('<periodoFiscal>02/2026</periodoFiscal>');
     });
 
@@ -525,7 +589,9 @@ describe('XmlBuilderService', () => {
     it('debe incluir impuestosDocSustento', () => {
       const xml = service.buildRetencion(createRetencion());
       expect(xml).toContain('<impuestosDocSustento>');
-      expect(xml).toContain('<codImpuestoDocSustento>2</codImpuestoDocSustento>');
+      expect(xml).toContain(
+        '<codImpuestoDocSustento>2</codImpuestoDocSustento>',
+      );
       expect(xml).toContain('<valorImpuesto>120.00</valorImpuesto>');
     });
 
@@ -537,14 +603,18 @@ describe('XmlBuilderService', () => {
 
     it('debe lanzar BadRequestException cuando tipoIdentificacion es 08 sin tipoSujetoRetenido', () => {
       const ret = createRetencion();
-      ret.infoCompRetencion.tipoIdentificacionSujetoRetenido = '08' as TipoIdentificacion;
+      ret.infoCompRetencion.tipoIdentificacionSujetoRetenido =
+        '08' as TipoIdentificacion;
       ret.infoCompRetencion.tipoSujetoRetenido = undefined;
-      expect(() => service.buildRetencion(ret)).toThrow('tipoSujetoRetenido es requerido');
+      expect(() => service.buildRetencion(ret)).toThrow(
+        'tipoSujetoRetenido es requerido',
+      );
     });
 
     it('debe incluir tipoSujetoRetenido cuando tipoIdentificacion es 08', () => {
       const ret = createRetencion();
-      ret.infoCompRetencion.tipoIdentificacionSujetoRetenido = '08' as TipoIdentificacion;
+      ret.infoCompRetencion.tipoIdentificacionSujetoRetenido =
+        '08' as TipoIdentificacion;
       ret.infoCompRetencion.tipoSujetoRetenido = '01';
       const xml = service.buildRetencion(ret);
       expect(xml).toContain('<tipoSujetoRetenido>01</tipoSujetoRetenido>');
@@ -571,10 +641,18 @@ describe('XmlBuilderService', () => {
     it('debe incluir infoGuiaRemision con campos obligatorios', () => {
       const xml = service.buildGuiaRemision(createGuiaRemision());
       expect(xml).toContain('<dirPartida>Bodega Central, Quito</dirPartida>');
-      expect(xml).toContain('<razonSocialTransportista>Transportes Rápidos Cía. Ltda.</razonSocialTransportista>');
-      expect(xml).toContain('<rucTransportista>0991234567001</rucTransportista>');
-      expect(xml).toContain('<fechaIniTransporte>07/02/2026</fechaIniTransporte>');
-      expect(xml).toContain('<fechaFinTransporte>10/02/2026</fechaFinTransporte>');
+      expect(xml).toContain(
+        '<razonSocialTransportista>Transportes Rápidos Cía. Ltda.</razonSocialTransportista>',
+      );
+      expect(xml).toContain(
+        '<rucTransportista>0991234567001</rucTransportista>',
+      );
+      expect(xml).toContain(
+        '<fechaIniTransporte>07/02/2026</fechaIniTransporte>',
+      );
+      expect(xml).toContain(
+        '<fechaFinTransporte>10/02/2026</fechaFinTransporte>',
+      );
       expect(xml).toContain('<placa>ABC-123</placa>');
     });
 
@@ -582,7 +660,9 @@ describe('XmlBuilderService', () => {
       const xml = service.buildGuiaRemision(createGuiaRemision());
       expect(xml).toContain('<destinatarios>');
       expect(xml).toContain('<destinatario>');
-      expect(xml).toContain('<identificacionDestinatario>1710034065</identificacionDestinatario>');
+      expect(xml).toContain(
+        '<identificacionDestinatario>1710034065</identificacionDestinatario>',
+      );
       expect(xml).toContain('<motivoTraslado>01</motivoTraslado>');
     });
 
@@ -622,7 +702,9 @@ describe('XmlBuilderService', () => {
       const gr = createGuiaRemision();
       gr.infoGuiaRemision.contribuyenteEspecial = '789';
       const xml = service.buildGuiaRemision(gr);
-      expect(xml).toContain('<contribuyenteEspecial>789</contribuyenteEspecial>');
+      expect(xml).toContain(
+        '<contribuyenteEspecial>789</contribuyenteEspecial>',
+      );
     });
   });
 

@@ -2,7 +2,11 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentController } from './document.controller';
-import { DocumentService, SUPPORTED_FORMATS, MIME_TYPES } from './document.service';
+import {
+  DocumentService,
+  SUPPORTED_FORMATS,
+  MIME_TYPES,
+} from './document.service';
 import { TemplateService } from '../template/template.service';
 
 jest.mock('fs', () => ({
@@ -36,7 +40,9 @@ describe('DocumentController', () => {
   beforeEach(async () => {
     documentService = {
       generateDocument: jest.fn().mockResolvedValue(Buffer.from('fake-doc')),
-      getMimeType: jest.fn((format: string) => MIME_TYPES[format] || 'application/octet-stream'),
+      getMimeType: jest.fn(
+        (format: string) => MIME_TYPES[format] || 'application/octet-stream',
+      ),
     };
     templateService = {
       findTemplate: jest.fn((id: string) => `/fake/templates/${id}.docx`),
@@ -73,27 +79,54 @@ describe('DocumentController', () => {
   describe('generateDocumentAndDownload', () => {
     it('should throw BadRequestException when no JSON data provided', async () => {
       await expect(
-        controller.generateDocumentAndDownload('tpl', {} as any, mockResponse, 'pdf', undefined),
+        controller.generateDocumentAndDownload(
+          'tpl',
+          {} as any,
+          mockResponse,
+          'pdf',
+          undefined,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when no format specified', async () => {
       await expect(
-        controller.generateDocumentAndDownload('tpl', { title: 'Test' }, mockResponse, undefined, undefined),
+        controller.generateDocumentAndDownload(
+          'tpl',
+          { title: 'Test' },
+          mockResponse,
+          undefined,
+          undefined,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should generate and download document with header format', async () => {
-      await controller.generateDocumentAndDownload('tpl', { title: 'Test' }, mockResponse, 'pdf', undefined);
+      await controller.generateDocumentAndDownload(
+        'tpl',
+        { title: 'Test' },
+        mockResponse,
+        'pdf',
+        undefined,
+      );
 
       expect(templateService.findTemplate).toHaveBeenCalledWith('tpl');
       expect(documentService.generateDocument).toHaveBeenCalled();
-      expect(mockResponse.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
+      expect(mockResponse.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'application/pdf',
+      );
       expect(mockResponse.send).toHaveBeenCalled();
     });
 
     it('should use query format when header format not provided', async () => {
-      await controller.generateDocumentAndDownload('tpl', { title: 'Test' }, mockResponse, undefined, 'docx');
+      await controller.generateDocumentAndDownload(
+        'tpl',
+        { title: 'Test' },
+        mockResponse,
+        undefined,
+        'docx',
+      );
 
       expect(mockResponse.setHeader).toHaveBeenCalledWith(
         'Content-Type',
@@ -121,13 +154,23 @@ describe('DocumentController', () => {
   describe('generateDocumentAndSave', () => {
     it('should throw BadRequestException when no JSON data provided', async () => {
       await expect(
-        controller.generateDocumentAndSave('tpl', {} as any, undefined, undefined),
+        controller.generateDocumentAndSave(
+          'tpl',
+          {} as any,
+          undefined,
+          undefined,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when no format specified', async () => {
       await expect(
-        controller.generateDocumentAndSave('tpl', { title: 'Test' }, undefined, undefined),
+        controller.generateDocumentAndSave(
+          'tpl',
+          { title: 'Test' },
+          undefined,
+          undefined,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 

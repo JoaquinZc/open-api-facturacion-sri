@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SriService } from './sri.service';
+import { DatabaseService } from '../../database';
 import { SriSoapClient } from './services';
 import { SriRepositoryService } from './services/sri-repository.service';
 import { XmlStorageService } from './services/xml-storage.service';
@@ -71,6 +72,12 @@ describe('SriService — Consultas', () => {
               return defaultValue;
             }),
           },
+        },
+        // `sincronizar` escribe en la base; las pruebas que lo ejercen lo
+        // configuran, el resto no lo toca.
+        {
+          provide: DatabaseService,
+          useValue: { query: jest.fn(), queryOne: jest.fn() },
         },
         {
           provide: 'BullQueue_sri-emision',
@@ -254,7 +261,10 @@ describe('SriService — Consultas', () => {
 
     it('U-LIST-07: paginación con cursor no retorna meta.total', async () => {
       const cursorData = Buffer.from(
-        JSON.stringify({ createdAt: mockRows[9].created_at, id: mockRows[9].id }),
+        JSON.stringify({
+          createdAt: mockRows[9].created_at,
+          id: mockRows[9].id,
+        }),
       ).toString('base64');
 
       repository.findComprobantes.mockResolvedValue({
@@ -285,11 +295,14 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-LIST-09: hasMore=true con nextCursor cuando hay más resultados', async () => {
-      const extraRows = [...mockRows, ...mockRows.slice(0, 6).map((r, i) => ({
-        ...r,
-        id: `comp-extra-${i}`,
-        created_at: new Date(`2026-03-0${i + 1}`),
-      }))];
+      const extraRows = [
+        ...mockRows,
+        ...mockRows.slice(0, 6).map((r, i) => ({
+          ...r,
+          id: `comp-extra-${i}`,
+          created_at: new Date(`2026-03-0${i + 1}`),
+        })),
+      ];
       repository.findComprobantes.mockResolvedValue({
         data: extraRows.slice(0, 21),
         total: 21,
@@ -314,7 +327,9 @@ describe('SriService — Consultas', () => {
       expect(item.claveAcceso).toBe(mockRows[0].clave_acceso);
       expect(item.rucEmisor).toBe(mockRows[0].ruc_emisor);
       expect(item.razonSocialEmisor).toBe(mockRows[0].razon_social_emisor);
-      expect(item.identificacionComprador).toBe(mockRows[0].identificacion_comprador);
+      expect(item.identificacionComprador).toBe(
+        mockRows[0].identificacion_comprador,
+      );
       expect(item.subtotal).toBe(100);
       expect(item.totalImpuestos).toBe(15);
       expect(item.total).toBe(115);
@@ -437,11 +452,14 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-LIST-18: nextCursor decodificado contiene createdAt e id del último item', async () => {
-      const extraRows = [...mockRows, ...mockRows.slice(0, 6).map((r, i) => ({
-        ...r,
-        id: `comp-extra-${i}`,
-        created_at: new Date(`2026-03-0${i + 1}`),
-      }))];
+      const extraRows = [
+        ...mockRows,
+        ...mockRows.slice(0, 6).map((r, i) => ({
+          ...r,
+          id: `comp-extra-${i}`,
+          created_at: new Date(`2026-03-0${i + 1}`),
+        })),
+      ];
       repository.findComprobantes.mockResolvedValue({
         data: extraRows.slice(0, 21),
         total: 21,
@@ -451,7 +469,9 @@ describe('SriService — Consultas', () => {
 
       expect(result.hasMore).toBe(true);
       expect(result.nextCursor).not.toBeNull();
-      const decoded = JSON.parse(Buffer.from(result.nextCursor!, 'base64').toString());
+      const decoded = JSON.parse(
+        Buffer.from(result.nextCursor!, 'base64').toString(),
+      );
       expect(decoded).toHaveProperty('createdAt');
       expect(decoded).toHaveProperty('id');
     });
@@ -552,16 +572,18 @@ describe('SriService — Consultas', () => {
       },
     ];
 
-    const mockInfoAdicional = [
-      { nombre: 'Email', valor: 'test@test.com' },
-    ];
+    const mockInfoAdicional = [{ nombre: 'Email', valor: 'test@test.com' }];
 
     it('U-DET-01: clave existente retorna objeto con detalles e infoAdicional', async () => {
       repository.findComprobanteConDetalles.mockResolvedValue(mockComprobante);
       repository.findDetallesByComprobanteId.mockResolvedValue(mockDetalles);
-      repository.findInfoAdicionalByComprobanteId.mockResolvedValue(mockInfoAdicional);
+      repository.findInfoAdicionalByComprobanteId.mockResolvedValue(
+        mockInfoAdicional,
+      );
 
-      const result = await service.obtenerComprobante(mockComprobante.clave_acceso);
+      const result = await service.obtenerComprobante(
+        mockComprobante.clave_acceso,
+      );
 
       expect(result).not.toBeNull();
       expect(result!.id).toBe('comp-1');
@@ -576,7 +598,9 @@ describe('SriService — Consultas', () => {
     it('U-DET-02: clave inexistente retorna null', async () => {
       repository.findComprobanteConDetalles.mockResolvedValue(null);
 
-      const result = await service.obtenerComprobante('no-existe-clave-49-digitos-1234567890123');
+      const result = await service.obtenerComprobante(
+        'no-existe-clave-49-digitos-1234567890123',
+      );
 
       expect(result).toBeNull();
     });
@@ -605,7 +629,9 @@ describe('SriService — Consultas', () => {
       ]);
       repository.findInfoAdicionalByComprobanteId.mockResolvedValue([]);
 
-      const result = await service.obtenerComprobante(mockComprobante.clave_acceso);
+      const result = await service.obtenerComprobante(
+        mockComprobante.clave_acceso,
+      );
 
       expect(result!.detalles).toHaveLength(2);
       expect(result!.detalles[0].cantidad).toBe(3);
@@ -618,7 +644,9 @@ describe('SriService — Consultas', () => {
       repository.findDetallesByComprobanteId.mockResolvedValue(mockDetalles);
       repository.findInfoAdicionalByComprobanteId.mockResolvedValue([]);
 
-      const result = await service.obtenerComprobante(mockComprobante.clave_acceso);
+      const result = await service.obtenerComprobante(
+        mockComprobante.clave_acceso,
+      );
 
       expect(result!.infoAdicional).toEqual([]);
     });
@@ -631,7 +659,9 @@ describe('SriService — Consultas', () => {
       repository.findDetallesByComprobanteId.mockResolvedValue(mockDetalles);
       repository.findInfoAdicionalByComprobanteId.mockResolvedValue([]);
 
-      const result = await service.obtenerComprobante(mockComprobante.clave_acceso);
+      const result = await service.obtenerComprobante(
+        mockComprobante.clave_acceso,
+      );
 
       expect(result!.xmlDisponible).toBe(true);
     });
@@ -645,7 +675,9 @@ describe('SriService — Consultas', () => {
       repository.findDetallesByComprobanteId.mockResolvedValue(mockDetalles);
       repository.findInfoAdicionalByComprobanteId.mockResolvedValue([]);
 
-      const result = await service.obtenerComprobante(mockComprobante.clave_acceso);
+      const result = await service.obtenerComprobante(
+        mockComprobante.clave_acceso,
+      );
 
       expect(result!.xmlDisponible).toBe(false);
     });
@@ -656,29 +688,50 @@ describe('SriService — Consultas', () => {
   // ==========================================
   describe('obtenerXmlAutorizado()', () => {
     it('U-XML-01: XML disponible retorna string con contenido', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'AUTORIZADO' } as any);
-      repository.findXmlAutorizado.mockResolvedValue({ path: '/path/to/xml.xml', contenido: null });
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'AUTORIZADO',
+      } as any);
+      repository.findXmlAutorizado.mockResolvedValue({
+        path: '/path/to/xml.xml',
+        contenido: null,
+      });
       xmlStorage.readXml.mockResolvedValue('<?xml version="1.0"?>...');
 
-      const result = await service.obtenerXmlAutorizado('0702202601092438363100110010010000000161245294013');
+      const result = await service.obtenerXmlAutorizado(
+        '0702202601092438363100110010010000000161245294013',
+      );
 
       expect(result).not.toBeNull();
       expect(result).toContain('<?xml');
     });
 
     it('U-XML-02: XML no disponible retorna null', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'PENDIENTE' } as any);
-      repository.findXmlAutorizado.mockResolvedValue({ path: null, contenido: null });
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'PENDIENTE',
+      } as any);
+      repository.findXmlAutorizado.mockResolvedValue({
+        path: null,
+        contenido: null,
+      });
+      // Lo que hace el `readXml` real sin ruta ni respaldo: no hay nada que leer.
+      xmlStorage.readXml.mockResolvedValue(null);
 
-      const result = await service.obtenerXmlAutorizado('0702202601092438363100110010010000000161245294013');
+      const result = await service.obtenerXmlAutorizado(
+        '0702202601092438363100110010010000000161245294013',
+      );
 
+      expect(xmlStorage.readXml).toHaveBeenCalledWith(null, null);
       expect(result).toBeNull();
     });
 
     it('U-XML-03: comprobante no existe retorna null', async () => {
       repository.findComprobanteByClaveAcceso.mockResolvedValue(null as any);
 
-      const result = await service.obtenerXmlAutorizado('0702202601092438363100110010010000000161245294013');
+      const result = await service.obtenerXmlAutorizado(
+        '0702202601092438363100110010010000000161245294013',
+      );
 
       expect(result).toBeNull();
     });
@@ -695,7 +748,9 @@ describe('SriService — Consultas', () => {
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
 
-      const result = await service.anularComprobante('0702202601092438363100110010010000000161245294013');
+      const result = await service.anularComprobante(
+        '0702202601092438363100110010010000000161245294013',
+      );
 
       expect(result.message).toContain('anulado');
       expect(result.estadoAnterior).toBe('PENDIENTE');
@@ -712,7 +767,9 @@ describe('SriService — Consultas', () => {
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
 
-      const result = await service.anularComprobante('0702202601092438363100110010010000000161245294013');
+      const result = await service.anularComprobante(
+        '0702202601092438363100110010010000000161245294013',
+      );
 
       expect(result.estadoAnterior).toBe('DEVUELTA');
     });
@@ -724,7 +781,9 @@ describe('SriService — Consultas', () => {
       } as any);
 
       await expect(
-        service.anularComprobante('0702202601092438363100110010010000000161245294013'),
+        service.anularComprobante(
+          '0702202601092438363100110010010000000161245294013',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -735,7 +794,9 @@ describe('SriService — Consultas', () => {
       } as any);
 
       await expect(
-        service.anularComprobante('0702202601092438363100110010010000000161245294013'),
+        service.anularComprobante(
+          '0702202601092438363100110010010000000161245294013',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -743,7 +804,9 @@ describe('SriService — Consultas', () => {
       repository.findComprobanteByClaveAcceso.mockResolvedValue(null as any);
 
       await expect(
-        service.anularComprobante('0702202601092438363100110010010000000161245294013'),
+        service.anularComprobante(
+          '0702202601092438363100110010010000000161245294013',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -760,11 +823,15 @@ describe('SriService — Consultas', () => {
     };
 
     it('U-REI-01: reintentar DEVUELTA exitoso — SRI autoriza', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue(mockComp as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue(
+        mockComp as any,
+      );
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/firmado.xml',
       } as any);
-      xmlStorage.readXml.mockResolvedValue('<?xml version="1.0"?><factura>...</factura>');
+      xmlStorage.readXml.mockResolvedValue(
+        '<?xml version="1.0"?><factura>...</factura>',
+      );
       sriSoapClient.enviarYAutorizar.mockResolvedValue({
         success: true,
         estado: 'AUTORIZADO',
@@ -775,7 +842,10 @@ describe('SriService — Consultas', () => {
         mensajes: [],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
+      xmlStorage.saveXml.mockResolvedValue({
+        path: '/path/to/autorizado.xml',
+        contenido: null,
+      });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.reintentarComprobante(claveAcceso);
@@ -783,9 +853,12 @@ describe('SriService — Consultas', () => {
       expect(result.estado).toBe('AUTORIZADO');
       expect(result.fechaAutorizacion).toBe('2026-02-07T15:00:00Z');
       expect(result.mensaje).toContain('autorizado');
-      expect(repository.updateComprobante).toHaveBeenCalledWith('comp-1', expect.objectContaining({
-        estado: 'AUTORIZADO',
-      }));
+      expect(repository.updateComprobante).toHaveBeenCalledWith(
+        'comp-1',
+        expect.objectContaining({
+          estado: 'AUTORIZADO',
+        }),
+      );
     });
 
     it('U-REI-02: reintentar RECHAZADO — reenvío al SRI', async () => {
@@ -801,7 +874,9 @@ describe('SriService — Consultas', () => {
         success: false,
         estado: 'RECHAZADO',
         claveAcceso,
-        mensajes: [{ tipo: 'ERROR', identificador: 'ERR-1', mensaje: 'Error test' }],
+        mensajes: [
+          { tipo: 'ERROR', identificador: 'ERR-1', mensaje: 'Error test' },
+        ],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
 
@@ -818,30 +893,42 @@ describe('SriService — Consultas', () => {
         estado: 'AUTORIZADO',
       } as any);
 
-      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(BadRequestException);
+      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('U-REI-04: sin XML firmado lanza BadRequestException', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue(mockComp as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue(
+        mockComp as any,
+      );
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: null,
       } as any);
 
-      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(BadRequestException);
+      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('U-REI-05: XML firmado no encontrado en filesystem lanza BadRequestException', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue(mockComp as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue(
+        mockComp as any,
+      );
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/firmado.xml',
       } as any);
       xmlStorage.readXml.mockResolvedValue(null);
 
-      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(BadRequestException);
+      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('U-REI-06: errores SRI mapeados a string[]', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue(mockComp as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue(
+        mockComp as any,
+      );
       repository.findXmlByComprobanteId.mockResolvedValue({
         xml_firmado_path: '/path/to/firmado.xml',
       } as any);
@@ -852,7 +939,12 @@ describe('SriService — Consultas', () => {
         claveAcceso,
         mensajes: [
           { tipo: 'ERROR', identificador: 'ERR-01', mensaje: 'Error 1' },
-          { tipo: 'ADVERTENCIA', identificador: 'WARN-01', mensaje: 'Warning 1', informacionAdicional: 'Extra info' },
+          {
+            tipo: 'ADVERTENCIA',
+            identificador: 'WARN-01',
+            mensaje: 'Warning 1',
+            informacionAdicional: 'Extra info',
+          },
         ],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
@@ -869,7 +961,9 @@ describe('SriService — Consultas', () => {
     it('U-REI-07: comprobante no existe lanza BadRequestException', async () => {
       repository.findComprobanteByClaveAcceso.mockResolvedValue(null as any);
 
-      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(BadRequestException);
+      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('U-REI-08: estado PENDIENTE permite reintentar', async () => {
@@ -891,7 +985,10 @@ describe('SriService — Consultas', () => {
         mensajes: [],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
+      xmlStorage.saveXml.mockResolvedValue({
+        path: '/path/to/autorizado.xml',
+        contenido: null,
+      });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.reintentarComprobante(claveAcceso);
@@ -913,7 +1010,9 @@ describe('SriService — Consultas', () => {
       sriSoapClient.enviarYAutorizar.mockResolvedValue({
         success: false,
         estado: 'DEVUELTA',
-        mensajes: [{ tipo: 'ERROR', identificador: 'ERR-1', mensaje: 'Error test' }],
+        mensajes: [
+          { tipo: 'ERROR', identificador: 'ERR-1', mensaje: 'Error test' },
+        ],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
 
@@ -930,7 +1029,9 @@ describe('SriService — Consultas', () => {
         estado: 'RECIBIDA',
       } as any);
 
-      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(BadRequestException);
+      await expect(service.reintentarComprobante(claveAcceso)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('U-REI-11: resultado sin errores retorna errores=undefined', async () => {
@@ -952,7 +1053,10 @@ describe('SriService — Consultas', () => {
         mensajes: [],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
+      xmlStorage.saveXml.mockResolvedValue({
+        path: '/path/to/autorizado.xml',
+        contenido: null,
+      });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.reintentarComprobante(claveAcceso);
@@ -968,7 +1072,10 @@ describe('SriService — Consultas', () => {
     const claveAcceso = '0702202601092438363100110010010000000161245294013';
 
     it('U-VER-01: SRI autorizado retorna existeEnSri=true', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'AUTORIZADO' } as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'AUTORIZADO',
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: {
@@ -990,8 +1097,13 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VER-02: SRI no existe retorna existeEnSri=false', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'PENDIENTE' } as any);
-      sriSoapClient.autorizarComprobante.mockResolvedValue({ autorizaciones: {} } as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'PENDIENTE',
+      } as any);
+      sriSoapClient.autorizarComprobante.mockResolvedValue({
+        autorizaciones: {},
+      } as any);
 
       const result = await service.verificarEnSri(claveAcceso);
 
@@ -1000,7 +1112,10 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VER-03: SRI devuelta con mensajes mapeados', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'DEVUELTA' } as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'DEVUELTA',
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: {
@@ -1024,11 +1139,16 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VER-04: clave inválida (no 49 dígitos) lanza BadRequestException', async () => {
-      await expect(service.verificarEnSri('123')).rejects.toThrow(BadRequestException);
+      await expect(service.verificarEnSri('123')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('U-VER-05: NO modifica BD local', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'PENDIENTE' } as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'PENDIENTE',
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: { estado: 'AUTORIZADO', mensajes: { mensaje: [] } },
@@ -1041,7 +1161,10 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VER-06: sincronizado=true cuando estados coinciden', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'AUTORIZADO' } as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'AUTORIZADO',
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: { estado: 'AUTORIZADO', mensajes: { mensaje: [] } },
@@ -1054,7 +1177,10 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VER-07: sincronizado=false cuando estados difieren', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'PENDIENTE' } as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'PENDIENTE',
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: { estado: 'AUTORIZADO', mensajes: { mensaje: [] } },
@@ -1068,11 +1194,18 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VER-08: múltiples autorizaciones toma la primera', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'AUTORIZADO' } as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'AUTORIZADO',
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: [
-            { estado: 'AUTORIZADO', fechaAutorizacion: '2026-02-07', mensajes: { mensaje: [] } },
+            {
+              estado: 'AUTORIZADO',
+              fechaAutorizacion: '2026-02-07',
+              mensajes: { mensaje: [] },
+            },
             { estado: 'NO AUTORIZADO', mensajes: { mensaje: [] } },
           ],
         },
@@ -1084,12 +1217,21 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VER-08: mensaje singular (no array) se mapea correctamente', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'DEVUELTA' } as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'DEVUELTA',
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: {
             estado: 'DEVUELTA',
-            mensajes: { mensaje: { tipo: 'ERROR', identificador: 'ERR-99', mensaje: 'Single mensaje' } },
+            mensajes: {
+              mensaje: {
+                tipo: 'ERROR',
+                identificador: 'ERR-99',
+                mensaje: 'Single mensaje',
+              },
+            },
           },
         },
       } as any);
@@ -1120,7 +1262,10 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VER-10: estado DESCONOCIDO cuando auth.estado es null', async () => {
-      repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'PENDIENTE' } as any);
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        estado: 'PENDIENTE',
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: {
@@ -1164,8 +1309,17 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-SYN-01: sincronización básica retorna resumen', async () => {
-      const comps = [mockCompRow('comp-1', 'PENDIENTE', '0702202601092438363100110010010000000161245294013')];
-      repository.findComprobantes.mockResolvedValue({ data: comps, total: 1 } as any);
+      const comps = [
+        mockCompRow(
+          'comp-1',
+          'PENDIENTE',
+          '0702202601092438363100110010010000000161245294013',
+        ),
+      ];
+      repository.findComprobantes.mockResolvedValue({
+        data: comps,
+        total: 1,
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: {
@@ -1178,7 +1332,10 @@ describe('SriService — Consultas', () => {
         },
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
+      xmlStorage.saveXml.mockResolvedValue({
+        path: '/path/to/autorizado.xml',
+        contenido: null,
+      });
       repository.saveXml.mockResolvedValue(undefined as any);
 
       const result = await service.sincronizarConSri({ limite: 10 });
@@ -1191,9 +1348,20 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-SYN-02: con reintentar=true reintenta los que no existen en SRI', async () => {
-      const comps = [mockCompRow('comp-1', 'PENDIENTE', '0702202601092438363100110010010000000161245294013')];
-      repository.findComprobantes.mockResolvedValue({ data: comps, total: 1 } as any);
-      sriSoapClient.autorizarComprobante.mockResolvedValue({ autorizaciones: {} } as any);
+      const comps = [
+        mockCompRow(
+          'comp-1',
+          'PENDIENTE',
+          '0702202601092438363100110010010000000161245294013',
+        ),
+      ];
+      repository.findComprobantes.mockResolvedValue({
+        data: comps,
+        total: 1,
+      } as any);
+      sriSoapClient.autorizarComprobante.mockResolvedValue({
+        autorizaciones: {},
+      } as any);
       // Mock reintentarComprobante dependencies
       repository.findComprobanteByClaveAcceso.mockResolvedValue({
         id: 'comp-1',
@@ -1214,17 +1382,26 @@ describe('SriService — Consultas', () => {
         mensajes: [],
       } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
-      xmlStorage.saveXml.mockResolvedValue({ path: '/path/to/autorizado.xml', contenido: null });
+      xmlStorage.saveXml.mockResolvedValue({
+        path: '/path/to/autorizado.xml',
+        contenido: null,
+      });
       repository.saveXml.mockResolvedValue(undefined as any);
 
-      const result = await service.sincronizarConSri({ reintentar: true, limite: 10 });
+      const result = await service.sincronizarConSri({
+        reintentar: true,
+        limite: 10,
+      });
 
       expect(result.reintentados).toBe(1);
       expect(result.detalle[0].accion).toBe('REINTENTADO');
     });
 
     it('U-SYN-03: sin pendientes retorna procesados=0', async () => {
-      repository.findComprobantes.mockResolvedValue({ data: [], total: 0 } as any);
+      repository.findComprobantes.mockResolvedValue({
+        data: [],
+        total: 0,
+      } as any);
 
       const result = await service.sincronizarConSri({ limite: 50 });
 
@@ -1235,10 +1412,19 @@ describe('SriService — Consultas', () => {
 
     it('U-SYN-04: límite respetado', async () => {
       const comps = Array.from({ length: 3 }, (_, i) =>
-        mockCompRow(`comp-${i}`, 'PENDIENTE', `0702202601092438363100110010010000000161245294${String(i).padStart(2, '0')}1`),
+        mockCompRow(
+          `comp-${i}`,
+          'PENDIENTE',
+          `0702202601092438363100110010010000000161245294${String(i).padStart(2, '0')}1`,
+        ),
       );
-      repository.findComprobantes.mockResolvedValue({ data: comps, total: 3 } as any);
-      sriSoapClient.autorizarComprobante.mockResolvedValue({ autorizaciones: {} } as any);
+      repository.findComprobantes.mockResolvedValue({
+        data: comps,
+        total: 3,
+      } as any);
+      sriSoapClient.autorizarComprobante.mockResolvedValue({
+        autorizaciones: {},
+      } as any);
 
       const result = await service.sincronizarConSri({ limite: 3 });
 
@@ -1247,16 +1433,26 @@ describe('SriService — Consultas', () => {
 
     it('U-SYN-05: batch processing en lotes de 50', async () => {
       const batch1 = Array.from({ length: 50 }, (_, i) =>
-        mockCompRow(`comp-${i}`, 'PENDIENTE', `0702202601092438363100110010010000000161245294${String(i).padStart(2, '0')}1`),
+        mockCompRow(
+          `comp-${i}`,
+          'PENDIENTE',
+          `0702202601092438363100110010010000000161245294${String(i).padStart(2, '0')}1`,
+        ),
       );
       const batch2 = Array.from({ length: 10 }, (_, i) =>
-        mockCompRow(`comp-${i + 50}`, 'PENDIENTE', `0702202601092438363100110010010000000161245294${String(i + 50).padStart(2, '0')}1`),
+        mockCompRow(
+          `comp-${i + 50}`,
+          'PENDIENTE',
+          `0702202601092438363100110010010000000161245294${String(i + 50).padStart(2, '0')}1`,
+        ),
       );
 
       repository.findComprobantes
         .mockResolvedValueOnce({ data: batch1, total: 60 } as any)
         .mockResolvedValueOnce({ data: batch2, total: 60 } as any);
-      sriSoapClient.autorizarComprobante.mockResolvedValue({ autorizaciones: {} } as any);
+      sriSoapClient.autorizarComprobante.mockResolvedValue({
+        autorizaciones: {},
+      } as any);
 
       const result = await service.sincronizarConSri({ limite: 60 });
 
@@ -1266,15 +1462,32 @@ describe('SriService — Consultas', () => {
 
     it('U-SYN-06: error no detiene el batch', async () => {
       const comps = [
-        mockCompRow('comp-1', 'PENDIENTE', '0702202601092438363100110010010000000161245294011'),
-        mockCompRow('comp-2', 'PENDIENTE', '0702202601092438363100110010010000000161245294021'),
+        mockCompRow(
+          'comp-1',
+          'PENDIENTE',
+          '0702202601092438363100110010010000000161245294011',
+        ),
+        mockCompRow(
+          'comp-2',
+          'PENDIENTE',
+          '0702202601092438363100110010010000000161245294021',
+        ),
       ];
-      repository.findComprobantes.mockResolvedValue({ data: comps, total: 2 } as any);
+      repository.findComprobantes.mockResolvedValue({
+        data: comps,
+        total: 2,
+      } as any);
       sriSoapClient.autorizarComprobante
         .mockRejectedValueOnce(new Error('SRI timeout'))
         .mockResolvedValueOnce({
           autorizaciones: {
-            autorizacion: { estado: 'AUTORIZADO', mensajes: { mensaje: [] }, comprobante: '<x/>', fechaAutorizacion: '2026-02-07', numeroAutorizacion: 'A1' },
+            autorizacion: {
+              estado: 'AUTORIZADO',
+              mensajes: { mensaje: [] },
+              comprobante: '<x/>',
+              fechaAutorizacion: '2026-02-07',
+              numeroAutorizacion: 'A1',
+            },
           },
         } as any);
       repository.updateComprobante.mockResolvedValue(undefined as any);
@@ -1289,8 +1502,17 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-SYN-07: evento comprobante.autorizado emitido', async () => {
-      const comps = [mockCompRow('comp-1', 'PENDIENTE', '0702202601092438363100110010010000000161245294013')];
-      repository.findComprobantes.mockResolvedValue({ data: comps, total: 1 } as any);
+      const comps = [
+        mockCompRow(
+          'comp-1',
+          'PENDIENTE',
+          '0702202601092438363100110010010000000161245294013',
+        ),
+      ];
+      repository.findComprobantes.mockResolvedValue({
+        data: comps,
+        total: 1,
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: {
@@ -1318,13 +1540,26 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-SYN-08: evento comprobante.rechazado emitido para RECHAZADO', async () => {
-      const comps = [mockCompRow('comp-1', 'PENDIENTE', '0702202601092438363100110010010000000161245294013')];
-      repository.findComprobantes.mockResolvedValue({ data: comps, total: 1 } as any);
+      const comps = [
+        mockCompRow(
+          'comp-1',
+          'PENDIENTE',
+          '0702202601092438363100110010010000000161245294013',
+        ),
+      ];
+      repository.findComprobantes.mockResolvedValue({
+        data: comps,
+        total: 1,
+      } as any);
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: {
             estado: 'NO AUTORIZADO',
-            mensajes: { mensaje: [{ tipo: 'ERROR', identificador: 'ERR', mensaje: 'Error' }] },
+            mensajes: {
+              mensaje: [
+                { tipo: 'ERROR', identificador: 'ERR', mensaje: 'Error' },
+              ],
+            },
           },
         },
       } as any);
@@ -1342,17 +1577,28 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-SYN-09: límite máximo global respeta SRI_SYNC_MAX_LIMIT', async () => {
-      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
-        if (key === 'SRI_SYNC_MAX_LIMIT') return 100;
-        if (key === 'SRI_REQUEST_DELAY_MS') return 0;
-        return defaultValue;
-      });
+      configService.get.mockImplementation(
+        (key: string, defaultValue?: unknown) => {
+          if (key === 'SRI_SYNC_MAX_LIMIT') return 100;
+          if (key === 'SRI_REQUEST_DELAY_MS') return 0;
+          return defaultValue;
+        },
+      );
 
       const comps = Array.from({ length: 50 }, (_, i) =>
-        mockCompRow(`comp-${i}`, 'PENDIENTE', `0702202601092438363100110010010000000161245294${String(i).padStart(2, '0')}1`),
+        mockCompRow(
+          `comp-${i}`,
+          'PENDIENTE',
+          `0702202601092438363100110010010000000161245294${String(i).padStart(2, '0')}1`,
+        ),
       );
-      repository.findComprobantes.mockResolvedValue({ data: comps, total: 50 } as any);
-      sriSoapClient.autorizarComprobante.mockResolvedValue({ autorizaciones: {} } as any);
+      repository.findComprobantes.mockResolvedValue({
+        data: comps,
+        total: 50,
+      } as any);
+      sriSoapClient.autorizarComprobante.mockResolvedValue({
+        autorizaciones: {},
+      } as any);
 
       const result = await service.sincronizarConSri({ limite: 500 });
 
@@ -1387,7 +1633,9 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-AUT-02: SRI no encontrado retorna success=false', async () => {
-      sriSoapClient.autorizarComprobante.mockResolvedValue({ autorizaciones: {} } as any);
+      sriSoapClient.autorizarComprobante.mockResolvedValue({
+        autorizaciones: {},
+      } as any);
 
       const result = await service.consultarAutorizacion(claveAcceso);
 
@@ -1399,7 +1647,12 @@ describe('SriService — Consultas', () => {
       sriSoapClient.autorizarComprobante.mockResolvedValue({
         autorizaciones: {
           autorizacion: [
-            { estado: 'AUTORIZADO', fechaAutorizacion: '2026-02-07', numeroAutorizacion: 'A1', mensajes: { mensaje: [] } },
+            {
+              estado: 'AUTORIZADO',
+              fechaAutorizacion: '2026-02-07',
+              numeroAutorizacion: 'A1',
+              mensajes: { mensaje: [] },
+            },
             { estado: 'NO AUTORIZADO', mensajes: { mensaje: [] } },
           ],
         },
@@ -1419,7 +1672,11 @@ describe('SriService — Consultas', () => {
             mensajes: {
               mensaje: [
                 { identificador: 'ERR-1', mensaje: 'Error 1', tipo: 'ERROR' },
-                { identificador: 'ERR-2', mensaje: 'Error 2', tipo: 'ADVERTENCIA' },
+                {
+                  identificador: 'ERR-2',
+                  mensaje: 'Error 2',
+                  tipo: 'ADVERTENCIA',
+                },
               ],
             },
           },
@@ -1438,7 +1695,8 @@ describe('SriService — Consultas', () => {
   // ==========================================
   describe('validarXml()', () => {
     it('U-VXML-01: XML válido con firma retorna valido=true', async () => {
-      const xml = '<?xml version="1.0"?><factura><infoTributaria><claveAcceso>1234567890123456789012345678901234567890123456789</claveAcceso></infoTributaria><ds:Signature>...</ds:Signature></factura>';
+      const xml =
+        '<?xml version="1.0"?><factura><infoTributaria><claveAcceso>1234567890123456789012345678901234567890123456789</claveAcceso></infoTributaria><ds:Signature>...</ds:Signature></factura>';
       const xmlBuilder = service['xmlBuilder'] as any;
       xmlBuilder.parseXml.mockResolvedValue(true);
 
@@ -1449,7 +1707,8 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VXML-02: XML sin firma digital retorna error', async () => {
-      const xml = '<?xml version="1.0"?><factura><infoTributaria><claveAcceso>1234567890123456789012345678901234567890123456789</claveAcceso></infoTributaria></factura>';
+      const xml =
+        '<?xml version="1.0"?><factura><infoTributaria><claveAcceso>1234567890123456789012345678901234567890123456789</claveAcceso></infoTributaria></factura>';
       const xmlBuilder = service['xmlBuilder'] as any;
       xmlBuilder.parseXml.mockResolvedValue(true);
 
@@ -1471,14 +1730,17 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VXML-04: XML sin clave de acceso de 49 dígitos retorna error', async () => {
-      const xml = '<?xml version="1.0"?><factura><infoTributaria><claveAcceso>123</claveAcceso></infoTributaria><ds:Signature>...</ds:Signature></factura>';
+      const xml =
+        '<?xml version="1.0"?><factura><infoTributaria><claveAcceso>123</claveAcceso></infoTributaria><ds:Signature>...</ds:Signature></factura>';
       const xmlBuilder = service['xmlBuilder'] as any;
       xmlBuilder.parseXml.mockResolvedValue(true);
 
       const result = await service.validarXml(xml);
 
       expect(result.valido).toBe(false);
-      expect(result.errores.some((e) => e.includes('clave de acceso'))).toBe(true);
+      expect(result.errores.some((e) => e.includes('clave de acceso'))).toBe(
+        true,
+      );
     });
 
     it('U-VXML-05: XML vacío retorna error', async () => {
@@ -1489,14 +1751,17 @@ describe('SriService — Consultas', () => {
     });
 
     it('U-VXML-06: tipo de comprobante inválido retorna error', async () => {
-      const xml = '<?xml version="1.0"?><otherDoc><infoTributaria><claveAcceso>1234567890123456789012345678901234567890123456789</claveAcceso></infoTributaria><ds:Signature>...</ds:Signature></otherDoc>';
+      const xml =
+        '<?xml version="1.0"?><otherDoc><infoTributaria><claveAcceso>1234567890123456789012345678901234567890123456789</claveAcceso></infoTributaria><ds:Signature>...</ds:Signature></otherDoc>';
       const xmlBuilder = service['xmlBuilder'] as any;
       xmlBuilder.parseXml.mockResolvedValue(true);
 
       const result = await service.validarXml(xml);
 
       expect(result.valido).toBe(false);
-      expect(result.errores.some((e) => e.includes('tipo de comprobante'))).toBe(true);
+      expect(
+        result.errores.some((e) => e.includes('tipo de comprobante')),
+      ).toBe(true);
     });
   });
 });

@@ -2,7 +2,16 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SriService } from './sri.service';
-import { SriSoapClient, FacturaService, NotaCreditoService, NotaDebitoService, RetencionService, GuiaRemisionService, XmlBuilderService } from './services';
+import { DatabaseService } from '../../database';
+import {
+  SriSoapClient,
+  FacturaService,
+  NotaCreditoService,
+  NotaDebitoService,
+  RetencionService,
+  GuiaRemisionService,
+  XmlBuilderService,
+} from './services';
 import { SriRepositoryService } from './services/sri-repository.service';
 import { XmlStorageService } from './services/xml-storage.service';
 import { CreateFacturaDto } from './dto';
@@ -41,10 +50,20 @@ describe('SriService — Emisión Factura', () => {
           cantidad: 2,
           precioUnitario: 100,
           descuento: 0,
-          impuestos: [{ codigo: '2', codigoPorcentaje: '2', tarifa: 12, baseImponible: 200, valor: 24 }],
+          impuestos: [
+            {
+              codigo: '2',
+              codigoPorcentaje: '2',
+              tarifa: 12,
+              baseImponible: 200,
+              valor: 24,
+            },
+          ],
         },
       ],
-      pagos: [{ formaPago: FormaPago.SIN_UTILIZACION_SISTEMA_FINANCIERO, total: 224 }],
+      pagos: [
+        { formaPago: FormaPago.SIN_UTILIZACION_SISTEMA_FINANCIERO, total: 224 },
+      ],
     } as any as CreateFacturaDto;
   }
 
@@ -56,11 +75,18 @@ describe('SriService — Emisión Factura', () => {
         SriService,
         {
           provide: SriSoapClient,
-          useValue: { autorizarComprobante: jest.fn(), enviarYAutorizar: jest.fn(), validarComprobante: jest.fn() },
+          useValue: {
+            autorizarComprobante: jest.fn(),
+            enviarYAutorizar: jest.fn(),
+            validarComprobante: jest.fn(),
+          },
         },
         {
           provide: SriRepositoryService,
-          useValue: { findComprobantes: jest.fn(), findComprobanteByClaveAcceso: jest.fn() },
+          useValue: {
+            findComprobantes: jest.fn(),
+            findComprobanteByClaveAcceso: jest.fn(),
+          },
         },
         {
           provide: XmlStorageService,
@@ -68,7 +94,11 @@ describe('SriService — Emisión Factura', () => {
         },
         {
           provide: FacturaService,
-          useValue: { emitirFactura: jest.fn(), generarXmlPreview: jest.fn(), generarFacturaFirmadaDebug: jest.fn() },
+          useValue: {
+            emitirFactura: jest.fn(),
+            generarXmlPreview: jest.fn(),
+            generarFacturaFirmadaDebug: jest.fn(),
+          },
         },
         { provide: NotaCreditoService, useValue: {} },
         { provide: NotaDebitoService, useValue: {} },
@@ -86,6 +116,12 @@ describe('SriService — Emisión Factura', () => {
           },
         },
         { provide: XmlBuilderService, useValue: { parseXml: jest.fn() } },
+        // `sincronizar` escribe en la base; las pruebas que lo ejercen lo
+        // configuran, el resto no lo toca.
+        {
+          provide: DatabaseService,
+          useValue: { query: jest.fn(), queryOne: jest.fn() },
+        },
         { provide: 'BullQueue_sri-emision', useValue: emisionQueue },
       ],
     }).compile();
@@ -103,7 +139,10 @@ describe('SriService — Emisión Factura', () => {
 
     const result = await service.emitirFactura(createValidDto());
 
-    expect(emisionQueue.add).toHaveBeenCalledWith('emision', expect.objectContaining({ tipo: 'FACTURA' }));
+    expect(emisionQueue.add).toHaveBeenCalledWith(
+      'emision',
+      expect.objectContaining({ tipo: 'FACTURA' }),
+    );
     expect(result).toEqual({
       mensaje: 'Factura encolada para emisión asíncrona',
       jobId: 'job-123',
@@ -129,7 +168,9 @@ describe('SriService — Emisión Factura', () => {
 
     const result = await service.emitirFactura(createValidDto());
 
-    expect(facturaService.emitirFactura).toHaveBeenCalledWith(expect.any(Object));
+    expect(facturaService.emitirFactura).toHaveBeenCalledWith(
+      expect.any(Object),
+    );
     expect(emisionQueue.add).not.toHaveBeenCalled();
     expect((result as any).success).toBe(true);
   });
@@ -138,7 +179,9 @@ describe('SriService — Emisión Factura', () => {
   // U-SRI-EMI-03: generarXmlPreview delega a FacturaService
   // ==========================================
   it('U-SRI-EMI-03: generarXmlPreview delega a FacturaService', async () => {
-    facturaService.generarXmlPreview.mockResolvedValue('<factura>xml</factura>');
+    facturaService.generarXmlPreview.mockResolvedValue(
+      '<factura>xml</factura>',
+    );
 
     const result = await service.generarXmlPreview(createValidDto());
 

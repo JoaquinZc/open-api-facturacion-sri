@@ -33,7 +33,8 @@ describe('SriSoapClient', () => {
               if (key === 'sri.rateLimiting.recepcion.delayMs') return 100;
               if (key === 'sri.rateLimiting.autorizacion.retries') return 5;
               if (key === 'sri.rateLimiting.autorizacion.delayMs') return 100;
-              if (key === 'sri.rateLimiting.autorizacion.backoffMultiplier') return 1.5;
+              if (key === 'sri.rateLimiting.autorizacion.backoffMultiplier')
+                return 1.5;
               return defaultValue;
             }),
           },
@@ -41,8 +42,12 @@ describe('SriSoapClient', () => {
         {
           provide: SriSoapFactoryService,
           useValue: {
-            getRecepcionClient: jest.fn().mockResolvedValue(mockRecepcionClient),
-            getAutorizacionClient: jest.fn().mockResolvedValue(mockAutorizacionClient),
+            getRecepcionClient: jest
+              .fn()
+              .mockResolvedValue(mockRecepcionClient),
+            getAutorizacionClient: jest
+              .fn()
+              .mockResolvedValue(mockAutorizacionClient),
           },
         },
       ],
@@ -74,8 +79,11 @@ describe('SriSoapClient', () => {
       expect(mockRecepcionClient.validarComprobanteAsync).toHaveBeenCalledWith({
         xml: expect.any(String),
       });
-      const callArg = mockRecepcionClient.validarComprobanteAsync.mock.calls[0][0];
-      expect(Buffer.from(callArg.xml, 'base64').toString('utf-8')).toBe('<factura/>');
+      const callArg =
+        mockRecepcionClient.validarComprobanteAsync.mock.calls[0][0];
+      expect(Buffer.from(callArg.xml, 'base64').toString('utf-8')).toBe(
+        '<factura/>',
+      );
     });
 
     it('debe retornar DEVUELTA cuando el SRI devuelve comprobantes con errores', async () => {
@@ -89,7 +97,11 @@ describe('SriSoapClient', () => {
                   claveAcceso: CLAVE_ACCESO,
                   mensajes: {
                     mensaje: [
-                      { identificador: 'ERROR-1', mensaje: 'XML inválido', tipo: 'ERROR' },
+                      {
+                        identificador: 'ERROR-1',
+                        mensaje: 'XML inválido',
+                        tipo: 'ERROR',
+                      },
                     ],
                   },
                 },
@@ -117,9 +129,13 @@ describe('SriSoapClient', () => {
     });
 
     it('debe lanzar error cuando el cliente SOAP falla', async () => {
-      mockRecepcionClient.validarComprobanteAsync.mockRejectedValue(new Error('Connection refused'));
+      mockRecepcionClient.validarComprobanteAsync.mockRejectedValue(
+        new Error('Connection refused'),
+      );
 
-      await expect(service.validarComprobante('<factura/>', '1')).rejects.toThrow('Connection refused');
+      await expect(
+        service.validarComprobante('<factura/>', '1'),
+      ).rejects.toThrow('Connection refused');
     });
 
     it('debe usar ambiente 2 para produccion', async () => {
@@ -192,9 +208,13 @@ describe('SriSoapClient', () => {
     });
 
     it('debe lanzar error cuando el cliente SOAP falla', async () => {
-      mockAutorizacionClient.autorizacionComprobanteAsync.mockRejectedValue(new Error('Timeout'));
+      mockAutorizacionClient.autorizacionComprobanteAsync.mockRejectedValue(
+        new Error('Timeout'),
+      );
 
-      await expect(service.autorizarComprobante(CLAVE_ACCESO)).rejects.toThrow('Timeout');
+      await expect(service.autorizarComprobante(CLAVE_ACCESO)).rejects.toThrow(
+        'Timeout',
+      );
     });
 
     it('debe manejar autorizacion con estado NO AUTORIZADO y mensajes', async () => {
@@ -211,7 +231,11 @@ describe('SriSoapClient', () => {
                   ambiente: '1',
                   mensajes: {
                     mensaje: [
-                      { identificador: 'ERR-1', mensaje: 'Error en campo X', tipo: 'ERROR' },
+                      {
+                        identificador: 'ERR-1',
+                        mensaje: 'Error en campo X',
+                        tipo: 'ERROR',
+                      },
                     ],
                   },
                 },
@@ -223,7 +247,9 @@ describe('SriSoapClient', () => {
 
       const result = await service.autorizarComprobante(CLAVE_ACCESO);
 
-      expect(result.autorizaciones!.autorizacion[0].estado).toBe('NO AUTORIZADO');
+      expect(result.autorizaciones!.autorizacion[0].estado).toBe(
+        'NO AUTORIZADO',
+      );
     });
   });
 
@@ -272,7 +298,11 @@ describe('SriSoapClient', () => {
                   claveAcceso: CLAVE_ACCESO,
                   mensajes: {
                     mensaje: [
-                      { identificador: 'ERR-1', mensaje: 'Campo requerido', tipo: 'ERROR' },
+                      {
+                        identificador: 'ERR-1',
+                        mensaje: 'Campo requerido',
+                        tipo: 'ERROR',
+                      },
                     ],
                   },
                 },
@@ -301,7 +331,11 @@ describe('SriSoapClient', () => {
           RespuestaAutorizacionComprobante: {
             numeroComprobantes: '1',
             autorizaciones: {
-              autorizacion: { estado: 'AUTORIZADO', numeroAutorizacion: '123', ambiente: '1' },
+              autorizacion: {
+                estado: 'AUTORIZADO',
+                numeroAutorizacion: '123',
+                ambiente: '1',
+              },
             },
           },
         },
@@ -311,17 +345,23 @@ describe('SriSoapClient', () => {
 
       expect(result.success).toBe(true);
       expect(result.estado).toBe('AUTORIZADO');
-      expect(mockRecepcionClient.validarComprobanteAsync).toHaveBeenCalledTimes(2);
+      expect(mockRecepcionClient.validarComprobanteAsync).toHaveBeenCalledTimes(
+        2,
+      );
     });
 
     it('debe lanzar error cuando todos los reintentos de recepcion fallan', async () => {
-      mockRecepcionClient.validarComprobanteAsync.mockRejectedValue(new Error('ECONNREFUSED'));
+      mockRecepcionClient.validarComprobanteAsync.mockRejectedValue(
+        new Error('ECONNREFUSED'),
+      );
 
       await expect(
         service.enviarYAutorizar('<factura/>', CLAVE_ACCESO),
       ).rejects.toThrow('ECONNREFUSED');
 
-      expect(mockRecepcionClient.validarComprobanteAsync).toHaveBeenCalledTimes(3);
+      expect(mockRecepcionClient.validarComprobanteAsync).toHaveBeenCalledTimes(
+        3,
+      );
     });
 
     it('debe retornar NO AUTORIZADO cuando SRI rechaza', async () => {
@@ -338,7 +378,11 @@ describe('SriSoapClient', () => {
                 ambiente: '1',
                 mensajes: {
                   mensaje: [
-                    { identificador: 'ERR-1', mensaje: 'Clave de acceso incorrecta', tipo: 'ERROR' },
+                    {
+                      identificador: 'ERR-1',
+                      mensaje: 'Clave de acceso incorrecta',
+                      tipo: 'ERROR',
+                    },
                   ],
                 },
               },
@@ -374,7 +418,9 @@ describe('SriSoapClient', () => {
       expect(result.success).toBe(false);
       expect(result.estado).toBe('EN PROCESO');
       expect(result.mensajes[0].identificador).toBe('TIMEOUT');
-      expect(mockAutorizacionClient.autorizacionComprobanteAsync).toHaveBeenCalledTimes(5);
+      expect(
+        mockAutorizacionClient.autorizacionComprobanteAsync,
+      ).toHaveBeenCalledTimes(5);
     });
 
     it('debe manejar autorizacion como array con multiple elementos', async () => {
@@ -388,7 +434,11 @@ describe('SriSoapClient', () => {
             autorizaciones: {
               autorizacion: [
                 { estado: 'EN PROCESO', ambiente: '1' },
-                { estado: 'AUTORIZADO', numeroAutorizacion: '999', ambiente: '1' },
+                {
+                  estado: 'AUTORIZADO',
+                  numeroAutorizacion: '999',
+                  ambiente: '1',
+                },
               ],
             },
           },
@@ -432,7 +482,10 @@ describe('SriSoapClient', () => {
       jest.spyOn(service as any, 'delayWithBackoff').mockRestore();
 
       const delaySpy = jest.spyOn(global, 'setTimeout');
-      delaySpy.mockImplementation((cb: any) => { cb(); return undefined as any; });
+      delaySpy.mockImplementation((cb: any) => {
+        cb();
+        return undefined as any;
+      });
 
       await (service as any).delayWithBackoff(2000, 3, 1.5);
 
@@ -446,7 +499,10 @@ describe('SriSoapClient', () => {
       jest.spyOn(service as any, 'delayWithBackoff').mockRestore();
 
       const delaySpy = jest.spyOn(global, 'setTimeout');
-      delaySpy.mockImplementation((cb: any) => { cb(); return undefined as any; });
+      delaySpy.mockImplementation((cb: any) => {
+        cb();
+        return undefined as any;
+      });
 
       await (service as any).delayWithBackoff(10000, 10, 3);
 
@@ -469,7 +525,11 @@ describe('SriSoapClient', () => {
               comprobante: {
                 claveAcceso: CLAVE_ACCESO,
                 mensajes: {
-                  mensaje: { identificador: 'ERR-1', mensaje: 'Error', tipo: 'ERROR' },
+                  mensaje: {
+                    identificador: 'ERR-1',
+                    mensaje: 'Error',
+                    tipo: 'ERROR',
+                  },
                 },
               },
             },

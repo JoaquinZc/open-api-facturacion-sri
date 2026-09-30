@@ -1,8 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import request from 'supertest';
 import { SriController } from '../src/modules/sri/sri.controller';
+import { RideService } from '../src/modules/sri/services/ride.service';
 import { SriService } from '../src/modules/sri/sri.service';
 import { EmisoresService } from '../src/modules/emisores/emisores.service';
 import { ConfigService } from '@nestjs/config';
@@ -25,6 +31,15 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     email: 'user@test.com',
     rol: UserRole.ADMIN,
     tenantId: 'tenant-abc',
+  };
+
+  // El endpoint de depuración firma con el certificado de cualquier emisor:
+  // solo SUPERADMIN puede usarlo (ver U-CTRL-EMI-18).
+  const superadminUser: JwtPayload = {
+    sub: 'user-root',
+    email: 'root@test.com',
+    rol: UserRole.SUPERADMIN,
+    tenantId: null,
   };
 
   function createValidFacturaBody() {
@@ -50,10 +65,20 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
           cantidad: 2,
           precioUnitario: 100,
           descuento: 0,
-          impuestos: [{ codigo: '2', codigoPorcentaje: '2', tarifa: 12, baseImponible: 200, valor: 24 }],
+          impuestos: [
+            {
+              codigo: '2',
+              codigoPorcentaje: '2',
+              tarifa: 12,
+              baseImponible: 200,
+              valor: 24,
+            },
+          ],
         },
       ],
-      pagos: [{ formaPago: FormaPago.SIN_UTILIZACION_SISTEMA_FINANCIERO, total: 224 }],
+      pagos: [
+        { formaPago: FormaPago.SIN_UTILIZACION_SISTEMA_FINANCIERO, total: 224 },
+      ],
     };
   }
 
@@ -76,6 +101,7 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
             findByTenantId: jest.fn(),
           },
         },
+        { provide: RideService, useValue: { generarRide: jest.fn() } },
         {
           provide: ConfigService,
           useValue: {
@@ -185,7 +211,10 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     const body = createValidFacturaBody();
     (body as any).emisor = {};
 
-    await request(app.getHttpServer()).post('/sri/emitir/factura').send(body).expect(400);
+    await request(app.getHttpServer())
+      .post('/sri/emitir/factura')
+      .send(body)
+      .expect(400);
   });
 
   // ==========================================
@@ -198,7 +227,10 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     const body = createValidFacturaBody();
     delete (body as any).fechaEmision;
 
-    await request(app.getHttpServer()).post('/sri/emitir/factura').send(body).expect(400);
+    await request(app.getHttpServer())
+      .post('/sri/emitir/factura')
+      .send(body)
+      .expect(400);
   });
 
   // ==========================================
@@ -211,7 +243,10 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     const body = createValidFacturaBody();
     delete (body as any).detalles;
 
-    await request(app.getHttpServer()).post('/sri/emitir/factura').send(body).expect(400);
+    await request(app.getHttpServer())
+      .post('/sri/emitir/factura')
+      .send(body)
+      .expect(400);
   });
 
   // ==========================================
@@ -222,7 +257,9 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     app = appInstance;
     emisoresService = moduleFixture.get(EmisoresService);
 
-    emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('RUC no pertenece al tenant'));
+    emisoresService.validateRucAccess.mockRejectedValue(
+      new ForbiddenException('RUC no pertenece al tenant'),
+    );
 
     await request(app.getHttpServer())
       .post('/sri/emitir/factura')
@@ -239,7 +276,10 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
 
     const body = { ...createValidFacturaBody(), campoExtra: 'no permitido' };
 
-    await request(app.getHttpServer()).post('/sri/emitir/factura').send(body).expect(400);
+    await request(app.getHttpServer())
+      .post('/sri/emitir/factura')
+      .send(body)
+      .expect(400);
   });
 
   // ==========================================
@@ -250,7 +290,9 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     app = appInstance;
     sriService = moduleFixture.get(SriService);
 
-    sriService.generarXmlPreview.mockReturnValue('<factura>preview</factura>');
+    sriService.generarXmlPreview.mockResolvedValue(
+      '<factura>preview</factura>',
+    );
 
     const res = await request(app.getHttpServer())
       .post('/sri/preview/factura')
@@ -270,14 +312,18 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     const body = createValidFacturaBody();
     (body as any).emisor = {};
 
-    await request(app.getHttpServer()).post('/sri/preview/factura').send(body).expect(400);
+    await request(app.getHttpServer())
+      .post('/sri/preview/factura')
+      .send(body)
+      .expect(400);
   });
 
   // ==========================================
   // I-EMI-10: POST /sri/debug/factura-firmada — exitoso en test
   // ==========================================
   it('I-EMI-10: POST /sri/debug/factura-firmada retorna 200 con XML firmado', async () => {
-    const { appInstance, moduleFixture } = await createAppWithUser(adminUser);
+    const { appInstance, moduleFixture } =
+      await createAppWithUser(superadminUser);
     app = appInstance;
     sriService = moduleFixture.get(SriService);
 
@@ -323,7 +369,10 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
 
     const body = { ...createValidFacturaBody(), fechaEmision: '2026-02-07' };
 
-    await request(app.getHttpServer()).post('/sri/emitir/factura').send(body).expect(400);
+    await request(app.getHttpServer())
+      .post('/sri/emitir/factura')
+      .send(body)
+      .expect(400);
   });
 
   // ==========================================
@@ -336,7 +385,10 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     const body = createValidFacturaBody();
     delete (body.comprador as any).identificacion;
 
-    await request(app.getHttpServer()).post('/sri/emitir/factura').send(body).expect(400);
+    await request(app.getHttpServer())
+      .post('/sri/emitir/factura')
+      .send(body)
+      .expect(400);
   });
 
   // ==========================================
@@ -349,7 +401,10 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     const body = createValidFacturaBody();
     delete (body.detalles[0] as any).impuestos;
 
-    await request(app.getHttpServer()).post('/sri/emitir/factura').send(body).expect(400);
+    await request(app.getHttpServer())
+      .post('/sri/emitir/factura')
+      .send(body)
+      .expect(400);
   });
 
   // ==========================================
@@ -362,6 +417,9 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     const body = createValidFacturaBody();
     delete (body as any).pagos;
 
-    await request(app.getHttpServer()).post('/sri/emitir/factura').send(body).expect(400);
+    await request(app.getHttpServer())
+      .post('/sri/emitir/factura')
+      .send(body)
+      .expect(400);
   });
 });

@@ -1,7 +1,12 @@
 import { Test } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SriController } from './sri.controller';
+import { RideService } from './services/ride.service';
 import { SriService } from './sri.service';
 import { EmisoresService } from '../emisores/emisores.service';
 import { JwtPayload, UserRole } from '../auth/dto/auth.dto';
@@ -66,6 +71,7 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
             findByTenantId: jest.fn(),
           },
         },
+        { provide: RideService, useValue: { generarRide: jest.fn() } },
         {
           provide: ConfigService,
           useValue: {
@@ -90,7 +96,10 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
   describe('listarComprobantes() — Multi-tenant', () => {
     it('U-CTRL-LIST-01: SUPERADMIN sin rucEmisor pasa directo al servicio', async () => {
       const query: QueryComprobantesDto = { page: 1, limit: 20 };
-      const mockResult = { data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } };
+      const mockResult = {
+        data: [],
+        meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
+      };
       sriService.listarComprobantes.mockResolvedValue(mockResult as any);
 
       const result = await controller.listarComprobantes(query, superadminUser);
@@ -101,8 +110,15 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
     });
 
     it('U-CTRL-LIST-02: SUPERADMIN con rucEmisor pasa directo sin validación de tenant', async () => {
-      const query: QueryComprobantesDto = { rucEmisor: '0924383631001', page: 1, limit: 20 };
-      const mockResult = { data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } };
+      const query: QueryComprobantesDto = {
+        rucEmisor: '0924383631001',
+        page: 1,
+        limit: 20,
+      };
+      const mockResult = {
+        data: [],
+        meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
+      };
       sriService.listarComprobantes.mockResolvedValue(mockResult as any);
 
       await controller.listarComprobantes(query, superadminUser);
@@ -112,13 +128,23 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
     });
 
     it('U-CTRL-LIST-03: ADMIN con rucEmisor valida acceso al tenant', async () => {
-      const query: QueryComprobantesDto = { rucEmisor: '0924383631001', page: 1, limit: 20 };
+      const query: QueryComprobantesDto = {
+        rucEmisor: '0924383631001',
+        page: 1,
+        limit: 20,
+      };
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
-      sriService.listarComprobantes.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } } as any);
+      sriService.listarComprobantes.mockResolvedValue({
+        data: [],
+        meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
+      } as any);
 
       await controller.listarComprobantes(query, adminUser);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', adminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        '0924383631001',
+        adminUser,
+      );
       expect(sriService.listarComprobantes).toHaveBeenCalledWith(query);
     });
 
@@ -126,7 +152,10 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
       const query: QueryComprobantesDto = { page: 1, limit: 20 };
       const mockEmisores = [{ id: 'emisor-1' }, { id: 'emisor-2' }];
       emisoresService.findByTenantId.mockResolvedValue(mockEmisores as any);
-      sriService.listarComprobantes.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } } as any);
+      sriService.listarComprobantes.mockResolvedValue({
+        data: [],
+        meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
+      } as any);
 
       await controller.listarComprobantes(query, adminUser);
 
@@ -159,26 +188,49 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
     });
 
     it('U-CTRL-LIST-07: ADMIN con rucEmisor ajeno a tenant lanza ForbiddenException', async () => {
-      const query: QueryComprobantesDto = { rucEmisor: '9999999999999', page: 1, limit: 20 };
-      emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('RUC no pertenece al tenant'));
+      const query: QueryComprobantesDto = {
+        rucEmisor: '9999999999999',
+        page: 1,
+        limit: 20,
+      };
+      emisoresService.validateRucAccess.mockRejectedValue(
+        new ForbiddenException('RUC no pertenece al tenant'),
+      );
 
-      await expect(controller.listarComprobantes(query, adminUser)).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.listarComprobantes(query, adminUser),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('U-CTRL-LIST-08: USER con rucEmisor valida acceso al tenant', async () => {
-      const query: QueryComprobantesDto = { rucEmisor: '0924383631001', page: 1, limit: 10 };
+      const query: QueryComprobantesDto = {
+        rucEmisor: '0924383631001',
+        page: 1,
+        limit: 10,
+      };
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
-      sriService.listarComprobantes.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } } as any);
+      sriService.listarComprobantes.mockResolvedValue({
+        data: [],
+        meta: { total: 0, page: 1, limit: 10, totalPages: 0 },
+      } as any);
 
       await controller.listarComprobantes(query, regularUser);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', regularUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        '0924383631001',
+        regularUser,
+      );
     });
 
     it('U-CTRL-LIST-09: USER sin rucEmisor filtra por tenant', async () => {
       const query: QueryComprobantesDto = { page: 1, limit: 10 };
-      emisoresService.findByTenantId.mockResolvedValue([{ id: 'emisor-x' }] as any);
-      sriService.listarComprobantes.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } } as any);
+      emisoresService.findByTenantId.mockResolvedValue([
+        { id: 'emisor-x' },
+      ] as any);
+      sriService.listarComprobantes.mockResolvedValue({
+        data: [],
+        meta: { total: 0, page: 1, limit: 10, totalPages: 0 },
+      } as any);
 
       await controller.listarComprobantes(query, regularUser);
 
@@ -192,7 +244,10 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
     it('U-CTRL-LIST-10: ADMIN sin tenantId pasa directo al servicio', async () => {
       const userNoTenant: JwtPayload = { ...adminUser, tenantId: null };
       const query: QueryComprobantesDto = { page: 1, limit: 20 };
-      sriService.listarComprobantes.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } } as any);
+      sriService.listarComprobantes.mockResolvedValue({
+        data: [],
+        meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
+      } as any);
 
       await controller.listarComprobantes(query, userNoTenant);
 
@@ -206,47 +261,80 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
   // ==========================================
   describe('obtenerComprobante() — Multi-tenant', () => {
     it('U-CTRL-DET-01: SUPERADMIN obtiene comprobante sin validación de tenant', async () => {
-      const mockComp = { id: 'comp-1', claveAcceso, detalles: [], xmlDisponible: true };
+      const mockComp = {
+        id: 'comp-1',
+        claveAcceso,
+        detalles: [],
+        xmlDisponible: true,
+      };
       sriService.obtenerComprobante.mockResolvedValue(mockComp as any);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
-      const result = await controller.obtenerComprobante(claveAcceso, superadminUser);
+      const result = await controller.obtenerComprobante(
+        claveAcceso,
+        superadminUser,
+      );
 
       expect(result).toEqual(mockComp);
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, superadminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        superadminUser,
+      );
     });
 
     it('U-CTRL-DET-02: ADMIN obtiene comprobante tras validación de tenant', async () => {
-      const mockComp = { id: 'comp-1', claveAcceso, detalles: [], xmlDisponible: true };
+      const mockComp = {
+        id: 'comp-1',
+        claveAcceso,
+        detalles: [],
+        xmlDisponible: true,
+      };
       sriService.obtenerComprobante.mockResolvedValue(mockComp as any);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
       await controller.obtenerComprobante(claveAcceso, adminUser);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, adminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        adminUser,
+      );
     });
 
     it('U-CTRL-DET-03: comprobante no encontrado lanza NotFoundException', async () => {
       sriService.obtenerComprobante.mockResolvedValue(null);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
-      await expect(controller.obtenerComprobante(claveAcceso, superadminUser)).rejects.toThrow(NotFoundException);
+      await expect(
+        controller.obtenerComprobante(claveAcceso, superadminUser),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('U-CTRL-DET-04: ADMIN sin acceso al RUC lanza ForbiddenException', async () => {
-      emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('Acceso denegado'));
+      emisoresService.validateRucAccess.mockRejectedValue(
+        new ForbiddenException('Acceso denegado'),
+      );
 
-      await expect(controller.obtenerComprobante(claveAcceso, adminUser)).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.obtenerComprobante(claveAcceso, adminUser),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('U-CTRL-DET-05: USER obtiene comprobante tras validación de tenant', async () => {
-      const mockComp = { id: 'comp-1', claveAcceso, detalles: [], xmlDisponible: true };
+      const mockComp = {
+        id: 'comp-1',
+        claveAcceso,
+        detalles: [],
+        xmlDisponible: true,
+      };
       sriService.obtenerComprobante.mockResolvedValue(mockComp as any);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
       await controller.obtenerComprobante(claveAcceso, regularUser);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, regularUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        regularUser,
+      );
     });
   });
 
@@ -266,8 +354,14 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
 
       await controller.descargarXml(claveAcceso, mockRes, superadminUser);
 
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'application/xml');
-      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Disposition', `attachment; filename="${claveAcceso}.xml"`);
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'application/xml',
+      );
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Content-Disposition',
+        `attachment; filename="${claveAcceso}.xml"`,
+      );
       expect(mockRes.send).toHaveBeenCalledWith(xml);
     });
 
@@ -275,13 +369,19 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
       sriService.obtenerXmlAutorizado.mockResolvedValue(null);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
-      await expect(controller.descargarXml(claveAcceso, mockRes, superadminUser)).rejects.toThrow(NotFoundException);
+      await expect(
+        controller.descargarXml(claveAcceso, mockRes, superadminUser),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('U-CTRL-XML-03: ADMIN sin acceso al RUC lanza ForbiddenException', async () => {
-      emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('Acceso denegado'));
+      emisoresService.validateRucAccess.mockRejectedValue(
+        new ForbiddenException('Acceso denegado'),
+      );
 
-      await expect(controller.descargarXml(claveAcceso, mockRes, adminUser)).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.descargarXml(claveAcceso, mockRes, adminUser),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -290,37 +390,62 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
   // ==========================================
   describe('anularComprobante() — Multi-tenant', () => {
     it('U-CTRL-ANU-01: SUPERADMIN anula comprobante tras validación', async () => {
-      const mockResult = { message: 'Comprobante anulado', claveAcceso, estadoAnterior: 'PENDIENTE' };
+      const mockResult = {
+        message: 'Comprobante anulado',
+        claveAcceso,
+        estadoAnterior: 'PENDIENTE',
+      };
       sriService.anularComprobante.mockResolvedValue(mockResult as any);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
-      const result = await controller.anularComprobante(claveAcceso, superadminUser);
+      const result = await controller.anularComprobante(
+        claveAcceso,
+        superadminUser,
+      );
 
       expect(result.message).toContain('anulado');
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, superadminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        superadminUser,
+      );
     });
 
     it('U-CTRL-ANU-02: ADMIN anula tras validación de tenant', async () => {
-      const mockResult = { message: 'Comprobante anulado', claveAcceso, estadoAnterior: 'PENDIENTE' };
+      const mockResult = {
+        message: 'Comprobante anulado',
+        claveAcceso,
+        estadoAnterior: 'PENDIENTE',
+      };
       sriService.anularComprobante.mockResolvedValue(mockResult as any);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
       await controller.anularComprobante(claveAcceso, adminUser);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, adminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        adminUser,
+      );
     });
 
     it('U-CTRL-ANU-03: ADMIN sin acceso al RUC lanza ForbiddenException', async () => {
-      emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('Acceso denegado'));
+      emisoresService.validateRucAccess.mockRejectedValue(
+        new ForbiddenException('Acceso denegado'),
+      );
 
-      await expect(controller.anularComprobante(claveAcceso, adminUser)).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.anularComprobante(claveAcceso, adminUser),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('U-CTRL-ANU-04: servicio lanza BadRequestException para AUTORIZADO', async () => {
-      sriService.anularComprobante.mockRejectedValue(new BadRequestException('No se puede anular'));
+      sriService.anularComprobante.mockRejectedValue(
+        new BadRequestException('No se puede anular'),
+      );
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
-      await expect(controller.anularComprobante(claveAcceso, superadminUser)).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.anularComprobante(claveAcceso, superadminUser),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -329,30 +454,52 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
   // ==========================================
   describe('reintentarComprobante() — Multi-tenant', () => {
     it('U-CTRL-REI-01: SUPERADMIN reintenta tras validación', async () => {
-      const mockResult = { claveAcceso, estado: 'AUTORIZADO', mensaje: 'Autorizado', fechaAutorizacion: '2026-02-07' };
+      const mockResult = {
+        claveAcceso,
+        estado: 'AUTORIZADO',
+        mensaje: 'Autorizado',
+        fechaAutorizacion: '2026-02-07',
+      };
       sriService.reintentarComprobante.mockResolvedValue(mockResult as any);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
-      const result = await controller.reintentarComprobante(claveAcceso, superadminUser);
+      const result = await controller.reintentarComprobante(
+        claveAcceso,
+        superadminUser,
+      );
 
       expect(result.estado).toBe('AUTORIZADO');
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, superadminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        superadminUser,
+      );
     });
 
     it('U-CTRL-REI-02: ADMIN reintenta tras validación de tenant', async () => {
-      const mockResult = { claveAcceso, estado: 'AUTORIZADO', mensaje: 'Autorizado' };
+      const mockResult = {
+        claveAcceso,
+        estado: 'AUTORIZADO',
+        mensaje: 'Autorizado',
+      };
       sriService.reintentarComprobante.mockResolvedValue(mockResult as any);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
       await controller.reintentarComprobante(claveAcceso, adminUser);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, adminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        adminUser,
+      );
     });
 
     it('U-CTRL-REI-03: ADMIN sin acceso al RUC lanza ForbiddenException', async () => {
-      emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('Acceso denegado'));
+      emisoresService.validateRucAccess.mockRejectedValue(
+        new ForbiddenException('Acceso denegado'),
+      );
 
-      await expect(controller.reintentarComprobante(claveAcceso, adminUser)).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.reintentarComprobante(claveAcceso, adminUser),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -361,37 +508,64 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
   // ==========================================
   describe('verificarEnSri() — Multi-tenant', () => {
     it('U-CTRL-VER-01: SUPERADMIN verifica tras validación', async () => {
-      const mockResult = { claveAcceso, existeEnSri: true, estado: 'AUTORIZADO', sincronizado: true };
+      const mockResult = {
+        claveAcceso,
+        existeEnSri: true,
+        estado: 'AUTORIZADO',
+        sincronizado: true,
+      };
       sriService.verificarEnSri.mockResolvedValue(mockResult as any);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
-      const result = await controller.verificarEnSri(claveAcceso, superadminUser);
+      const result = await controller.verificarEnSri(
+        claveAcceso,
+        superadminUser,
+      );
 
       expect(result.existeEnSri).toBe(true);
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, superadminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        superadminUser,
+      );
     });
 
     it('U-CTRL-VER-02: ADMIN verifica tras validación de tenant', async () => {
-      const mockResult = { claveAcceso, existeEnSri: false, estado: 'NO EXISTE', sincronizado: false };
+      const mockResult = {
+        claveAcceso,
+        existeEnSri: false,
+        estado: 'NO EXISTE',
+        sincronizado: false,
+      };
       sriService.verificarEnSri.mockResolvedValue(mockResult as any);
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
       await controller.verificarEnSri(claveAcceso, adminUser);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, adminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        adminUser,
+      );
     });
 
     it('U-CTRL-VER-03: ADMIN sin acceso al RUC lanza ForbiddenException', async () => {
-      emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('Acceso denegado'));
+      emisoresService.validateRucAccess.mockRejectedValue(
+        new ForbiddenException('Acceso denegado'),
+      );
 
-      await expect(controller.verificarEnSri(claveAcceso, adminUser)).rejects.toThrow(ForbiddenException);
+      await expect(
+        controller.verificarEnSri(claveAcceso, adminUser),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('U-CTRL-VER-04: servicio lanza BadRequestException para clave inválida', async () => {
-      sriService.verificarEnSri.mockRejectedValue(new BadRequestException('Clave inválida'));
+      sriService.verificarEnSri.mockRejectedValue(
+        new BadRequestException('Clave inválida'),
+      );
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
 
-      await expect(controller.verificarEnSri('123', superadminUser)).rejects.toThrow();
+      await expect(
+        controller.verificarEnSri('123', superadminUser),
+      ).rejects.toThrow();
     });
   });
 
@@ -401,7 +575,13 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
   describe('sincronizar() — Multi-tenant', () => {
     it('U-CTRL-SYN-01: SUPERADMIN sincroniza sin rucEmisor', async () => {
       const body = { estados: ['PENDIENTE'], reintentar: false, limite: 50 };
-      const mockResult = { procesados: 5, actualizados: 3, reintentados: 0, errores: 0, detalle: [] };
+      const mockResult = {
+        procesados: 5,
+        actualizados: 3,
+        reintentados: 0,
+        errores: 0,
+        detalle: [],
+      };
       sriService.sincronizarConSri.mockResolvedValue(mockResult as any);
 
       const result = await controller.sincronizar(body, superadminUser);
@@ -412,8 +592,18 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
     });
 
     it('U-CTRL-SYN-02: SUPERADMIN con rucEmisor pasa directo', async () => {
-      const body = { estados: ['PENDIENTE'], rucEmisor: '0924383631001', limite: 50 };
-      const mockResult = { procesados: 0, actualizados: 0, reintentados: 0, errores: 0, detalle: [] };
+      const body = {
+        estados: ['PENDIENTE'],
+        rucEmisor: '0924383631001',
+        limite: 50,
+      };
+      const mockResult = {
+        procesados: 0,
+        actualizados: 0,
+        reintentados: 0,
+        errores: 0,
+        detalle: [],
+      };
       sriService.sincronizarConSri.mockResolvedValue(mockResult as any);
 
       await controller.sincronizar(body, superadminUser);
@@ -424,48 +614,93 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
     it('U-CTRL-SYN-03: ADMIN sin rucEmisor lanza ForbiddenException', async () => {
       const body = { estados: ['PENDIENTE'], reintentar: false, limite: 50 };
 
-      await expect(controller.sincronizar(body, adminUser)).rejects.toThrow(ForbiddenException);
+      await expect(controller.sincronizar(body, adminUser)).rejects.toThrow(
+        ForbiddenException,
+      );
       expect(sriService.sincronizarConSri).not.toHaveBeenCalled();
     });
 
     it('U-CTRL-SYN-04: ADMIN con rucEmisor valida acceso y sincroniza', async () => {
-      const body = { estados: ['PENDIENTE'], rucEmisor: '0924383631001', limite: 50 };
+      const body = {
+        estados: ['PENDIENTE'],
+        rucEmisor: '0924383631001',
+        limite: 50,
+      };
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
-      sriService.sincronizarConSri.mockResolvedValue({ procesados: 2, actualizados: 1, reintentados: 0, errores: 0, detalle: [] } as any);
+      sriService.sincronizarConSri.mockResolvedValue({
+        procesados: 2,
+        actualizados: 1,
+        reintentados: 0,
+        errores: 0,
+        detalle: [],
+      } as any);
 
       const result = await controller.sincronizar(body, adminUser);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', adminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        '0924383631001',
+        adminUser,
+      );
       expect(result.procesados).toBe(2);
     });
 
     it('U-CTRL-SYN-05: ADMIN con rucEmisor ajeno lanza ForbiddenException', async () => {
-      const body = { estados: ['PENDIENTE'], rucEmisor: '9999999999999', limite: 50 };
-      emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('RUC no pertenece al tenant'));
+      const body = {
+        estados: ['PENDIENTE'],
+        rucEmisor: '9999999999999',
+        limite: 50,
+      };
+      emisoresService.validateRucAccess.mockRejectedValue(
+        new ForbiddenException('RUC no pertenece al tenant'),
+      );
 
-      await expect(controller.sincronizar(body, adminUser)).rejects.toThrow(ForbiddenException);
+      await expect(controller.sincronizar(body, adminUser)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('U-CTRL-SYN-06: USER sin rucEmisor lanza ForbiddenException', async () => {
       const body = { estados: ['DEVUELTA'], reintentar: true, limite: 10 };
 
-      await expect(controller.sincronizar(body, regularUser)).rejects.toThrow(ForbiddenException);
+      await expect(controller.sincronizar(body, regularUser)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('U-CTRL-SYN-07: USER con rucEmisor valida y sincroniza', async () => {
-      const body = { estados: ['DEVUELTA'], rucEmisor: '0924383631001', reintentar: true, limite: 10 };
+      const body = {
+        estados: ['DEVUELTA'],
+        rucEmisor: '0924383631001',
+        reintentar: true,
+        limite: 10,
+      };
       emisoresService.validateRucAccess.mockResolvedValue(undefined as any);
-      sriService.sincronizarConSri.mockResolvedValue({ procesados: 1, actualizados: 0, reintentados: 1, errores: 0, detalle: [] } as any);
+      sriService.sincronizarConSri.mockResolvedValue({
+        procesados: 1,
+        actualizados: 0,
+        reintentados: 1,
+        errores: 0,
+        detalle: [],
+      } as any);
 
       const result = await controller.sincronizar(body, regularUser);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', regularUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        '0924383631001',
+        regularUser,
+      );
       expect(result.reintentados).toBe(1);
     });
 
     it('U-CTRL-SYN-08: body vacío (estados por defecto) funciona para SUPERADMIN', async () => {
       const body = {};
-      sriService.sincronizarConSri.mockResolvedValue({ procesados: 0, actualizados: 0, reintentados: 0, errores: 0, detalle: [] } as any);
+      sriService.sincronizarConSri.mockResolvedValue({
+        procesados: 0,
+        actualizados: 0,
+        reintentados: 0,
+        errores: 0,
+        detalle: [],
+      } as any);
 
       const result = await controller.sincronizar(body, superadminUser);
 
@@ -478,7 +713,9 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
   // QueryComprobantesDto — Validación
   // ==========================================
   describe('QueryComprobantesDto — Validación', () => {
-    async function validateDto(dto: Partial<QueryComprobantesDto>): Promise<string[]> {
+    async function validateDto(
+      dto: Partial<QueryComprobantesDto>,
+    ): Promise<string[]> {
       const instance = plainToInstance(QueryComprobantesDto, dto);
       const errors = await validate(instance as any);
       return errors.map((e) => Object.values(e.constraints || {}).join(', '));
@@ -527,7 +764,9 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
     });
 
     it('U-DTO-09: estado=AUTORIZADO es válido (enum)', async () => {
-      const errors = await validateDto({ estado: EstadoComprobante.AUTORIZADO });
+      const errors = await validateDto({
+        estado: EstadoComprobante.AUTORIZADO,
+      });
       expect(errors).toHaveLength(0);
     });
 
@@ -553,17 +792,23 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
     });
 
     it('U-DTO-14: tipoComprobante=01 (factura) es válido', async () => {
-      const errors = await validateDto({ tipoComprobante: TipoComprobanteQuery.FACTURA });
+      const errors = await validateDto({
+        tipoComprobante: TipoComprobanteQuery.FACTURA,
+      });
       expect(errors).toHaveLength(0);
     });
 
     it('U-DTO-15: tipoComprobante=04 (nota crédito) es válido', async () => {
-      const errors = await validateDto({ tipoComprobante: TipoComprobanteQuery.NOTA_CREDITO });
+      const errors = await validateDto({
+        tipoComprobante: TipoComprobanteQuery.NOTA_CREDITO,
+      });
       expect(errors).toHaveLength(0);
     });
 
     it('U-DTO-16: tipoComprobante=07 (retención) es válido', async () => {
-      const errors = await validateDto({ tipoComprobante: TipoComprobanteQuery.RETENCION });
+      const errors = await validateDto({
+        tipoComprobante: TipoComprobanteQuery.RETENCION,
+      });
       expect(errors).toHaveLength(0);
     });
 
@@ -603,7 +848,9 @@ describe('SriController — Consultas (Multi-tenant + DTO)', () => {
     });
 
     it('U-DTO-24: identificacionComprador como string es válido', async () => {
-      const errors = await validateDto({ identificacionComprador: '1701234567' });
+      const errors = await validateDto({
+        identificacionComprador: '1701234567',
+      });
       expect(errors).toHaveLength(0);
     });
 

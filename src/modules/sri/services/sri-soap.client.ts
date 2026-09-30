@@ -22,8 +22,13 @@ export class SriSoapClient {
     private readonly soapFactory: SriSoapFactoryService,
   ) {}
 
-  async validarComprobante(xmlFirmado: string, ambiente: '1' | '2'): Promise<SriRecepcionResponse> {
-    this.logger.log(`Enviando comprobante al SRI para validación (Ambiente ${ambiente})`);
+  async validarComprobante(
+    xmlFirmado: string,
+    ambiente: '1' | '2',
+  ): Promise<SriRecepcionResponse> {
+    this.logger.log(
+      `Enviando comprobante al SRI para validación (Ambiente ${ambiente})`,
+    );
     const xmlBase64 = Buffer.from(xmlFirmado, 'utf-8').toString('base64');
 
     try {
@@ -58,10 +63,9 @@ export class SriSoapClient {
     try {
       const ambiente = claveAcceso.charAt(23) as '1' | '2';
       const client = await this.soapFactory.getAutorizacionClient(ambiente);
-      const [result] =
-        await client.autorizacionComprobanteAsync({
-          claveAccesoComprobante: claveAcceso,
-        });
+      const [result] = await client.autorizacionComprobanteAsync({
+        claveAccesoComprobante: claveAcceso,
+      });
 
       const response = result?.RespuestaAutorizacionComprobante || result;
       this.logger.log(
@@ -87,22 +91,27 @@ export class SriSoapClient {
   ): Promise<SriOperationResult> {
     // Leer configuración separada por operación desde configuration.ts
     const recepcionRetries = this.configService.get<number>(
-      'sri.rateLimiting.recepcion.retries', 3,
+      'sri.rateLimiting.recepcion.retries',
+      3,
     );
     const autorizacionRetries = this.configService.get<number>(
-      'sri.rateLimiting.autorizacion.retries', 5,
+      'sri.rateLimiting.autorizacion.retries',
+      5,
     );
     const autorizacionDelayMs = this.configService.get<number>(
-      'sri.rateLimiting.autorizacion.delayMs', 2000,
+      'sri.rateLimiting.autorizacion.delayMs',
+      2000,
     );
     const backoffMultiplier = this.configService.get<number>(
-      'sri.rateLimiting.autorizacion.backoffMultiplier', 1.5,
+      'sri.rateLimiting.autorizacion.backoffMultiplier',
+      1.5,
     );
 
     const ambiente = claveAcceso.charAt(23) as '1' | '2';
 
     const recepcionDelayMs = this.configService.get<number>(
-      'sri.rateLimiting.recepcion.delayMs', 2000,
+      'sri.rateLimiting.recepcion.delayMs',
+      2000,
     );
 
     let recepcion: SriRecepcionResponse | null = null;
@@ -156,7 +165,11 @@ export class SriSoapClient {
 
     for (let intento = 1; intento <= autorizacionRetries; intento++) {
       if (intento > 1) {
-        await this.delayWithBackoff(autorizacionDelayMs, intento, backoffMultiplier);
+        await this.delayWithBackoff(
+          autorizacionDelayMs,
+          intento,
+          backoffMultiplier,
+        );
       }
 
       const autorizacion = await this.autorizarComprobante(claveAcceso);
@@ -228,22 +241,30 @@ export class SriSoapClient {
     multiplier: number,
   ): Promise<void> {
     const ms = Math.min(baseMs * Math.pow(multiplier, attempt - 1), 30_000);
-    this.logger.debug(`Backoff: esperando ${Math.round(ms)}ms antes del intento ${attempt}`);
+    this.logger.debug(
+      `Backoff: esperando ${Math.round(ms)}ms antes del intento ${attempt}`,
+    );
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private parseRecepcionResponse(response: Record<string, unknown>): SriRecepcionResponse {
+  private parseRecepcionResponse(
+    response: Record<string, unknown>,
+  ): SriRecepcionResponse {
     return {
       estado: (response?.estado as 'RECIBIDA' | 'DEVUELTA') || 'DEVUELTA',
-      comprobantes: response?.comprobantes as SriRecepcionResponse['comprobantes'],
+      comprobantes:
+        response?.comprobantes as SriRecepcionResponse['comprobantes'],
     };
   }
 
-  private parseAutorizacionResponse(response: Record<string, unknown>): SriAutorizacionResponse {
+  private parseAutorizacionResponse(
+    response: Record<string, unknown>,
+  ): SriAutorizacionResponse {
     return {
       claveAccesoConsultada: (response?.claveAccesoConsultada as string) || '',
       numeroComprobantes: (response?.numeroComprobantes as string) || '0',
-      autorizaciones: response?.autorizaciones as SriAutorizacionResponse['autorizaciones'],
+      autorizaciones:
+        response?.autorizaciones as SriAutorizacionResponse['autorizaciones'],
     };
   }
 

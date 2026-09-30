@@ -49,7 +49,10 @@ describe('JwtAuthGuard', () => {
     const result = guard.canActivate(mockContext());
 
     expect(result).toBe(true);
-    expect(reflector.getAllAndOverride).toHaveBeenCalledWith('isPublic', expect.any(Array));
+    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(
+      'isPublic',
+      expect.any(Array),
+    );
   });
 
   it('debe consultar IS_PUBLIC_KEY en handler y class cuando es público', () => {
@@ -57,9 +60,9 @@ describe('JwtAuthGuard', () => {
 
     guard.canActivate(mockContext());
 
-    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(
-      'isPublic',
-      [expect.anything(), expect.anything()],
-    );
+    expect(reflector.getAllAndOverride).toHaveBeenCalledWith('isPublic', [
+      expect.anything(),
+      expect.anything(),
+    ]);
   });
 });

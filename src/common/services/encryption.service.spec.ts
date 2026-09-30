@@ -166,15 +166,15 @@ describe('EncryptionService', () => {
     });
 
     it('debe lanzar error si el IV no es hex válido', async () => {
-      await expect(
-        service.decrypt('no-hex:abc123'),
-      ).rejects.toThrow();
+      await expect(service.decrypt('no-hex:abc123')).rejects.toThrow();
     });
 
     it('debe poder desencriptar múltiples valores en secuencia', async () => {
       const texts = ['uno', 'dos', 'tres'];
       const encrypted = await Promise.all(texts.map((t) => service.encrypt(t)));
-      const decrypted = await Promise.all(encrypted.map((e) => service.decrypt(e)));
+      const decrypted = await Promise.all(
+        encrypted.map((e) => service.decrypt(e)),
+      );
 
       expect(decrypted).toEqual(texts);
     });

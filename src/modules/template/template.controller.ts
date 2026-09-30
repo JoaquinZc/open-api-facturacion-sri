@@ -147,7 +147,10 @@ export class TemplateController {
    */
   @Get('download/:id')
   @ApiOperation({ summary: 'Descargar archivo de template por ID' })
-  @ApiParam({ name: 'id', description: 'ID del template (nombre con o sin extensión)' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID del template (nombre con o sin extensión)',
+  })
   @ApiResponse({ status: 200, description: 'Archivo de template' })
   @ApiResponse({ status: 404, description: 'Template no encontrado' })
   downloadTemplate(@Param('id') id: string, @Res() res: Response) {

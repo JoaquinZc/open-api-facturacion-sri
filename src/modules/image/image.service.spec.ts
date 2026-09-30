@@ -41,7 +41,10 @@ describe('ImageService', () => {
     const module = await Test.createTestingModule({
       providers: [
         ImageService,
-        { provide: ConfigService, useValue: { get: jest.fn(() => 'http://localhost:3001') } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn(() => 'http://localhost:3001') },
+        },
       ],
     }).compile();
 
@@ -56,7 +59,11 @@ describe('ImageService', () => {
 
   describe('listImages', () => {
     it('should return images with metadata', () => {
-      (fs.readdirSync as jest.Mock).mockReturnValue(['logo.png', 'banner.jpg', 'readme.txt']);
+      (fs.readdirSync as jest.Mock).mockReturnValue([
+        'logo.png',
+        'banner.jpg',
+        'readme.txt',
+      ]);
       (fs.statSync as jest.Mock).mockReturnValue({
         size: 51200,
         birthtime: new Date('2026-01-01'),
@@ -71,7 +78,15 @@ describe('ImageService', () => {
     });
 
     it('should filter only valid image extensions', () => {
-      (fs.readdirSync as jest.Mock).mockReturnValue(['a.png', 'b.jpg', 'c.jpeg', 'd.gif', 'e.webp', 'f.txt', 'g.pdf']);
+      (fs.readdirSync as jest.Mock).mockReturnValue([
+        'a.png',
+        'b.jpg',
+        'c.jpeg',
+        'd.gif',
+        'e.webp',
+        'f.txt',
+        'g.pdf',
+      ]);
       (fs.statSync as jest.Mock).mockReturnValue({
         size: 1024,
         birthtime: new Date(),
@@ -92,7 +107,13 @@ describe('ImageService', () => {
     });
 
     it('should apply pagination', () => {
-      (fs.readdirSync as jest.Mock).mockReturnValue(['a.png', 'b.png', 'c.png', 'd.png', 'e.png']);
+      (fs.readdirSync as jest.Mock).mockReturnValue([
+        'a.png',
+        'b.png',
+        'c.png',
+        'd.png',
+        'e.png',
+      ]);
       (fs.statSync as jest.Mock).mockReturnValue({
         size: 100,
         birthtime: new Date(),
@@ -118,7 +139,9 @@ describe('ImageService', () => {
 
     it('should throw NotFoundException when image does not exist', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(false);
-      expect(() => service.deleteImage('missing.png')).toThrow(NotFoundException);
+      expect(() => service.deleteImage('missing.png')).toThrow(
+        NotFoundException,
+      );
     });
   });
 

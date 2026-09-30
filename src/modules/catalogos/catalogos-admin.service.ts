@@ -1,7 +1,15 @@
-import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { CatalogoValidatorService } from '../sri/services/catalogo-validator.service';
-import type { CreateRetencionDto, UpdateRetencionDto } from './dto/catalogo-retencion.dto';
+import type {
+  CreateRetencionDto,
+  UpdateRetencionDto,
+} from './dto/catalogo-retencion.dto';
 
 @Injectable()
 export class CatalogosAdminService {
@@ -38,7 +46,9 @@ export class CatalogosAdminService {
       [dto.tipo, dto.codigo],
     );
     if (existing.rows.length > 0) {
-      throw new ConflictException(`Ya existe una retención con tipo ${dto.tipo} y código ${dto.codigo}`);
+      throw new ConflictException(
+        `Ya existe una retención con tipo ${dto.tipo} y código ${dto.codigo}`,
+      );
     }
 
     const result = await this.db.query<any>(
@@ -57,13 +67,18 @@ export class CatalogosAdminService {
     );
 
     await this.catalogoValidator.forceRefreshCache();
-    this.logger.log(`Retención creada: ${dto.tipo}-${dto.codigo} (${dto.porcentaje}%)`);
+    this.logger.log(
+      `Retención creada: ${dto.tipo}-${dto.codigo} (${dto.porcentaje}%)`,
+    );
 
     return this.mapRow(result.rows[0]);
   }
 
   async updateRetencion(id: string, dto: UpdateRetencionDto): Promise<any> {
-    const exists = await this.db.query<any>(`SELECT id FROM catalogo_retenciones WHERE id = $1`, [id]);
+    const exists = await this.db.query<any>(
+      `SELECT id FROM catalogo_retenciones WHERE id = $1`,
+      [id],
+    );
     if (exists.rows.length === 0) {
       throw new NotFoundException(`Retención con id ${id} no encontrada`);
     }
@@ -112,12 +127,18 @@ export class CatalogosAdminService {
   }
 
   async deleteRetencion(id: string): Promise<void> {
-    const exists = await this.db.query<any>(`SELECT id FROM catalogo_retenciones WHERE id = $1`, [id]);
+    const exists = await this.db.query<any>(
+      `SELECT id FROM catalogo_retenciones WHERE id = $1`,
+      [id],
+    );
     if (exists.rows.length === 0) {
       throw new NotFoundException(`Retención con id ${id} no encontrada`);
     }
 
-    await this.db.query(`UPDATE catalogo_retenciones SET activo = false, updated_at = NOW() WHERE id = $1`, [id]);
+    await this.db.query(
+      `UPDATE catalogo_retenciones SET activo = false, updated_at = NOW() WHERE id = $1`,
+      [id],
+    );
 
     await this.catalogoValidator.forceRefreshCache();
     this.logger.log(`Retención desactivada (soft delete): id=${id}`);

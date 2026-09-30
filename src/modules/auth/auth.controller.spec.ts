@@ -1,5 +1,10 @@
 import { Test } from '@nestjs/testing';
-import { UnauthorizedException, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  UnauthorizedException,
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { UserRole, JwtPayload } from './dto/auth.dto';
@@ -40,6 +45,7 @@ describe('AuthController', () => {
             refreshToken: jest.fn(),
             register: jest.fn(),
             changePassword: jest.fn(),
+            getProfile: jest.fn(),
           },
         },
       ],
@@ -64,9 +70,13 @@ describe('AuthController', () => {
     });
 
     it('debe propagar UnauthorizedException si las credenciales son inválidas', async () => {
-      authService.login.mockRejectedValueOnce(new UnauthorizedException('Credenciales inválidas'));
+      authService.login.mockRejectedValueOnce(
+        new UnauthorizedException('Credenciales inválidas'),
+      );
 
-      await expect(controller.login(loginDto)).rejects.toThrow(UnauthorizedException);
+      await expect(controller.login(loginDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
@@ -87,7 +97,9 @@ describe('AuthController', () => {
         new UnauthorizedException('Refresh token inválido o expirado'),
       );
 
-      await expect(controller.refresh(refreshDto)).rejects.toThrow(UnauthorizedException);
+      await expect(controller.refresh(refreshDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
@@ -115,10 +127,14 @@ describe('AuthController', () => {
 
     it('debe propagar ConflictException si el email ya existe', async () => {
       authService.register.mockRejectedValueOnce(
-        new ConflictException('Ya existe un usuario con el email newuser@test.com'),
+        new ConflictException(
+          'Ya existe un usuario con el email newuser@test.com',
+        ),
       );
 
-      await expect(controller.register(registerDto)).rejects.toThrow(ConflictException);
+      await expect(controller.register(registerDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('debe propagar NotFoundException si el tenant no existe', async () => {
@@ -126,35 +142,51 @@ describe('AuthController', () => {
         new NotFoundException('Tenant no encontrado'),
       );
 
-      await expect(controller.register(registerDto)).rejects.toThrow(NotFoundException);
+      await expect(controller.register(registerDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
+  /*
+   * `/auth/me` ya no devuelve el contenido del token: pregunta a la base por
+   * el usuario (`AuthService.getProfile`), para que un rol o un tenant
+   * cambiados después del login se vean sin esperar a que caduque el JWT.
+   */
   describe('GET /auth/me', () => {
-    it('debe retornar los datos del usuario autenticado', () => {
-      const result = controller.getProfile(mockUser);
+    const perfil = {
+      id: mockUser.sub,
+      email: mockUser.email,
+      rol: mockUser.rol,
+      tenantId: mockUser.tenantId,
+      tenantNombre: 'Tenant Test',
+      activo: true,
+    };
 
-      expect(result).toEqual({
-        id: mockUser.sub,
-        email: mockUser.email,
-        rol: mockUser.rol,
-        tenantId: mockUser.tenantId,
-      });
+    it('debe retornar los datos del usuario autenticado', async () => {
+      authService.getProfile.mockResolvedValue(perfil);
+
+      const result = await controller.getProfile(mockUser);
+
+      expect(result).toEqual(perfil);
     });
 
-    it('debe retornar el id desde sub del payload', () => {
+    it('debe buscar el usuario por el sub del payload', async () => {
       const userWithTenant: JwtPayload = {
         ...mockUser,
         sub: 'tenant-user-uuid',
         tenantId: 'tenant-abc',
         rol: UserRole.ADMIN,
       };
+      authService.getProfile.mockResolvedValue({
+        ...perfil,
+        id: 'tenant-user-uuid',
+      });
 
-      const result = controller.getProfile(userWithTenant);
+      const result = await controller.getProfile(userWithTenant);
 
+      expect(authService.getProfile).toHaveBeenCalledWith('tenant-user-uuid');
       expect(result.id).toBe('tenant-user-uuid');
-      expect(result.tenantId).toBe('tenant-abc');
-      expect(result.rol).toBe(UserRole.ADMIN);
     });
   });
 
@@ -169,7 +201,9 @@ describe('AuthController', () => {
 
       const result = await controller.changePassword(mockUser, changeDto);
 
-      expect(result).toEqual({ message: 'Contraseña actualizada exitosamente' });
+      expect(result).toEqual({
+        message: 'Contraseña actualizada exitosamente',
+      });
       expect(authService.changePassword).toHaveBeenCalledWith(
         mockUser.sub,
         changeDto.currentPassword,
@@ -182,7 +216,9 @@ describe('AuthController', () => {
         new UnauthorizedException('La contraseña actual es incorrecta'),
       );
 
-      await expect(controller.changePassword(mockUser, changeDto)).rejects.toThrow(UnauthorizedException);
+      await expect(
+        controller.changePassword(mockUser, changeDto),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('debe propagar NotFoundException si el usuario no existe', async () => {
@@ -190,7 +226,9 @@ describe('AuthController', () => {
         new NotFoundException('Usuario no encontrado'),
       );
 
-      await expect(controller.changePassword(mockUser, changeDto)).rejects.toThrow(NotFoundException);
+      await expect(
+        controller.changePassword(mockUser, changeDto),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('debe usar el sub del JwtPayload como userId', async () => {

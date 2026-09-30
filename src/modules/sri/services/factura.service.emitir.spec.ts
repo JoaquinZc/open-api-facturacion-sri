@@ -10,7 +10,12 @@ import { SriRepositoryService } from './sri-repository.service';
 import { XmlStorageService } from './xml-storage.service';
 import { SriBaseService } from './sri-base.service';
 import { CreateFacturaDto } from '../dto';
-import { TipoIdentificacion, FormaPago, Ambiente, TipoEmision } from '../constants';
+import {
+  TipoIdentificacion,
+  FormaPago,
+  Ambiente,
+  TipoEmision,
+} from '../constants';
 
 /**
  * Tests unitarios para FacturaService.emitirFactura
@@ -96,7 +101,11 @@ describe('FacturaService — Emisión', () => {
         {
           provide: ClaveAccesoService,
           useValue: {
-            generate: jest.fn().mockReturnValue('0702202601092438363100110010010000000161245294013'),
+            generate: jest
+              .fn()
+              .mockReturnValue(
+                '0702202601092438363100110010010000000161245294013',
+              ),
           },
         },
         {
@@ -108,7 +117,9 @@ describe('FacturaService — Emisión', () => {
         {
           provide: XmlSignerService,
           useValue: {
-            signXmlForEmisor: jest.fn().mockResolvedValue('<factura>signed</factura>'),
+            signXmlForEmisor: jest
+              .fn()
+              .mockResolvedValue('<factura>signed</factura>'),
           },
         },
         {
@@ -126,13 +137,21 @@ describe('FacturaService — Emisión', () => {
             findPuntoEmision: jest.fn().mockResolvedValue(mockPuntoEmision),
             executeInTransaction: jest.fn(),
             getNextSecuencial: jest.fn().mockResolvedValue('000000016'),
-            createComprobante: jest.fn().mockResolvedValue({ id: 'comp-uuid-1' }),
+            createComprobante: jest
+              .fn()
+              .mockResolvedValue({ id: 'comp-uuid-1' }),
             createDetalles: jest.fn().mockResolvedValue([{ id: 'det-uuid-1' }]),
-            createImpuestos: jest.fn().mockResolvedValue([{ id: 'imp-uuid-1' }]),
+            createImpuestos: jest
+              .fn()
+              .mockResolvedValue([{ id: 'imp-uuid-1' }]),
             createTotales: jest.fn().mockResolvedValue([{ id: 'tot-uuid-1' }]),
             createPagos: jest.fn().mockResolvedValue([{ id: 'pag-uuid-1' }]),
-            createInfoAdicional: jest.fn().mockResolvedValue([{ id: 'info-uuid-1' }]),
-            createDetallesAdicionales: jest.fn().mockResolvedValue([{ id: 'da-uuid-1' }]),
+            createInfoAdicional: jest
+              .fn()
+              .mockResolvedValue([{ id: 'info-uuid-1' }]),
+            createDetallesAdicionales: jest
+              .fn()
+              .mockResolvedValue([{ id: 'da-uuid-1' }]),
             saveXml: jest.fn().mockResolvedValue(undefined),
           },
         },
@@ -152,7 +171,9 @@ describe('FacturaService — Emisión', () => {
           provide: SriBaseService,
           useValue: {
             validarIdentificacion: jest.fn(),
-            validarTipoIdentificacionCatalogo: jest.fn().mockResolvedValue(undefined),
+            validarTipoIdentificacionCatalogo: jest
+              .fn()
+              .mockResolvedValue(undefined),
             validarImpuestosDetalles: jest.fn().mockResolvedValue(undefined),
             validarFormasPagoCatalogo: jest.fn().mockResolvedValue(undefined),
             getDefaultAmbiente: jest.fn().mockReturnValue(Ambiente.PRUEBAS),
@@ -196,7 +217,9 @@ describe('FacturaService — Emisión', () => {
   // U-FAC-01: Emisión exitosa — SRI autoriza
   // ==========================================
   it('U-FAC-01: Emisión exitosa retorna FacturaResponseDto con success=true', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202601092438363100110010010000000161245294013',
@@ -220,12 +243,16 @@ describe('FacturaService — Emisión', () => {
   // U-FAC-02: SRI devuelve comprobante (DEVUELTA)
   // ==========================================
   it('U-FAC-02: SRI devuelve comprobante → estado=DEVUELTA y emite evento rechazado', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: false,
       claveAcceso: '0702202601092438363100110010010000000161245294013',
       estado: 'DEVUELTA',
-      mensajes: [{ identificador: 'ERROR_1', mensaje: 'Campo inválido', tipo: 'ERROR' }],
+      mensajes: [
+        { identificador: 'ERROR_1', mensaje: 'Campo inválido', tipo: 'ERROR' },
+      ],
     });
 
     const result = await service.emitirFactura(createValidDto());
@@ -243,12 +270,16 @@ describe('FacturaService — Emisión', () => {
   // U-FAC-03: SRI rechaza comprobante (RECHAZADO)
   // ==========================================
   it('U-FAC-03: SRI rechaza → estado=RECHAZADO y emite evento rechazado', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: false,
       claveAcceso: '0702202601092438363100110010010000000161245294013',
       estado: 'RECHAZADO',
-      mensajes: [{ identificador: 'ERROR_2', mensaje: 'Firma inválida', tipo: 'ERROR' }],
+      mensajes: [
+        { identificador: 'ERROR_2', mensaje: 'Firma inválida', tipo: 'ERROR' },
+      ],
     });
 
     const result = await service.emitirFactura(createValidDto());
@@ -265,10 +296,14 @@ describe('FacturaService — Emisión', () => {
   // U-FAC-04: SRI timeout → persiste como PENDIENTE y relanza error
   // ==========================================
   it('U-FAC-04: SRI timeout → persiste PENDIENTE y relanza error', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
     sriSoapClient.enviarYAutorizar.mockRejectedValue(new Error('SRI timeout'));
 
-    await expect(service.emitirFactura(createValidDto())).rejects.toThrow('SRI timeout');
+    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(
+      'SRI timeout',
+    );
 
     // Debe haber persistido como PENDIENTE (executeInTransaction llamado 2 veces: secuencial + persistencia)
     expect(repository.executeInTransaction).toHaveBeenCalledTimes(2);
@@ -293,9 +328,13 @@ describe('FacturaService — Emisión', () => {
       certificado_password_encrypted: null,
     } as any);
 
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
 
-    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
@@ -304,14 +343,18 @@ describe('FacturaService — Emisión', () => {
   it('U-FAC-07: Punto de emisión no encontrado → lanza BadRequestException', async () => {
     repository.findPuntoEmision.mockResolvedValue(null as any);
 
-    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
   // U-FAC-08: Secuencial manual se respeta
   // ==========================================
   it('U-FAC-08: Secuencial manual se respeta y no consulta BD', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202601092438363100110010010000000161245294013',
@@ -338,7 +381,9 @@ describe('FacturaService — Emisión', () => {
       throw new BadRequestException('Cédula inválida');
     });
 
-    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
     expect(repository.findEmisorByRuc).not.toHaveBeenCalled();
   });
 
@@ -346,25 +391,35 @@ describe('FacturaService — Emisión', () => {
   // U-FAC-10: Validación de impuestos falla
   // ==========================================
   it('U-FAC-10: Impuestos inválidos → lanza error', async () => {
-    base.validarImpuestosDetalles.mockRejectedValue(new BadRequestException('Código de impuesto inválido'));
+    base.validarImpuestosDetalles.mockRejectedValue(
+      new BadRequestException('Código de impuesto inválido'),
+    );
 
-    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
   // U-FAC-11: Validación de formas de pago falla
   // ==========================================
   it('U-FAC-11: Forma de pago inválida → lanza error', async () => {
-    base.validarFormasPagoCatalogo.mockRejectedValue(new BadRequestException('Forma de pago no existe en catálogo'));
+    base.validarFormasPagoCatalogo.mockRejectedValue(
+      new BadRequestException('Forma de pago no existe en catálogo'),
+    );
 
-    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
   // U-FAC-12: Clave de acceso generada correctamente
   // ==========================================
   it('U-FAC-12: Clave de acceso se genera con datos correctos', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202601092438363100110010010000000161245294013',
@@ -390,7 +445,9 @@ describe('FacturaService — Emisión', () => {
   // U-FAC-13: XML se construye y firma
   // ==========================================
   it('U-FAC-13: XML se construye y se firma con certificado del emisor', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202601092438363100110010010000000161245294013',
@@ -413,7 +470,9 @@ describe('FacturaService — Emisión', () => {
   // U-FAC-14: Evento comprobante.autorizado emitido
   // ==========================================
   it('U-FAC-14: Autorización exitosa emite evento comprobante.autorizado', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202601092438363100110010010000000161245294013',
@@ -438,12 +497,16 @@ describe('FacturaService — Emisión', () => {
   // U-FAC-15: Descuento > subtotal lanza error
   // ==========================================
   it('U-FAC-15: Descuento mayor al subtotal del detalle → lanza BadRequestException', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
 
     const dto = createValidDto();
     dto.detalles[0].descuento = 500; // subtotal = 2*100 = 200, descuento 500 > 200
 
-    await expect(service.emitirFactura(dto)).rejects.toThrow(BadRequestException);
+    await expect(service.emitirFactura(dto)).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
@@ -481,7 +544,9 @@ describe('FacturaService — Emisión', () => {
     const dto = createValidDto();
     delete dto.secuencial;
 
-    await expect(service.generarFacturaFirmadaDebug(dto)).rejects.toThrow(BadRequestException);
+    await expect(service.generarFacturaFirmadaDebug(dto)).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
@@ -535,7 +600,9 @@ describe('FacturaService — Emisión', () => {
       }
       return fn({} as any);
     });
-    repository.createComprobante.mockRejectedValue(new Error('DB connection lost'));
+    repository.createComprobante.mockRejectedValue(
+      new Error('DB connection lost'),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202601092438363100110010010000000161245294013',
@@ -545,7 +612,9 @@ describe('FacturaService — Emisión', () => {
       mensajes: [],
     });
 
-    await expect(service.emitirFactura(createValidDto())).rejects.toThrow('DB connection lost');
+    await expect(service.emitirFactura(createValidDto())).rejects.toThrow(
+      'DB connection lost',
+    );
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'comprobante.persistencia_fallida',
@@ -560,7 +629,9 @@ describe('FacturaService — Emisión', () => {
   // U-FAC-22: Ambiente por defecto cuando no se especifica
   // ==========================================
   it('U-FAC-22: Sin ambiente en la petición, usa el del emisor', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn({} as any));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn({} as any),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202601092438363100110010010000000161245294013',

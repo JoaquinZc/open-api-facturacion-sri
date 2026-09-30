@@ -17,10 +17,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         connection: {
-          host:     configService.getOrThrow<string>('redis.host'),
-          port:     configService.getOrThrow<number>('redis.port'),
+          host: configService.getOrThrow<string>('redis.host'),
+          port: configService.getOrThrow<number>('redis.port'),
           password: configService.get<string>('redis.password') || undefined,
-          db:       configService.getOrThrow<number>('redis.db'),
+          db: configService.getOrThrow<number>('redis.db'),
           maxRetriesPerRequest: null, // Requerido por BullMQ
         },
       }),
@@ -33,16 +33,24 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         defaultJobOptions: {
-          attempts: configService.getOrThrow<number>('queues.sriEmision.attempts'),
+          attempts: configService.getOrThrow<number>(
+            'queues.sriEmision.attempts',
+          ),
           backoff: {
             type: 'exponential',
-            delay: configService.getOrThrow<number>('queues.sriEmision.backoffDelayMs'),
+            delay: configService.getOrThrow<number>(
+              'queues.sriEmision.backoffDelayMs',
+            ),
           },
           removeOnComplete: {
-            count: configService.getOrThrow<number>('queues.sriEmision.removeOnComplete'),
+            count: configService.getOrThrow<number>(
+              'queues.sriEmision.removeOnComplete',
+            ),
           },
           removeOnFail: {
-            count: configService.getOrThrow<number>('queues.sriEmision.removeOnFail'),
+            count: configService.getOrThrow<number>(
+              'queues.sriEmision.removeOnFail',
+            ),
           },
         },
       }),
@@ -55,16 +63,24 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         defaultJobOptions: {
-          attempts: configService.getOrThrow<number>('queues.webhookDispatch.attempts'),
+          attempts: configService.getOrThrow<number>(
+            'queues.webhookDispatch.attempts',
+          ),
           backoff: {
             type: 'exponential',
-            delay: configService.getOrThrow<number>('queues.webhookDispatch.backoffDelayMs'),
+            delay: configService.getOrThrow<number>(
+              'queues.webhookDispatch.backoffDelayMs',
+            ),
           },
           removeOnComplete: {
-            count: configService.getOrThrow<number>('queues.webhookDispatch.removeOnComplete'),
+            count: configService.getOrThrow<number>(
+              'queues.webhookDispatch.removeOnComplete',
+            ),
           },
           removeOnFail: {
-            count: configService.getOrThrow<number>('queues.webhookDispatch.removeOnFail'),
+            count: configService.getOrThrow<number>(
+              'queues.webhookDispatch.removeOnFail',
+            ),
           },
         },
       }),

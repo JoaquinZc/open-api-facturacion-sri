@@ -43,11 +43,17 @@ jest.mock('node-forge', () => {
         pkcs8ShroudedKeyBag: '1.2.840.113549.1.12.10.1.2',
         certBag: '1.2.840.113549.1.12.10.1.3',
       },
-      privateKeyToPem: jest.fn(() => '-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKjQ\n-----END RSA PRIVATE KEY-----'),
+      privateKeyToPem: jest.fn(
+        () =>
+          '-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKjQ\n-----END RSA PRIVATE KEY-----',
+      ),
       privateKeyFromPem: jest.fn(() => mockPrivateKey),
       privateKeyToAsn1: jest.fn(() => 'priv-asn1'),
       wrapRsaPrivateKey: jest.fn(() => 'wrapped-key'),
-      privateKeyInfoToPem: jest.fn(() => '-----BEGIN PRIVATE KEY-----\nMIIBVgIBADAN\n-----END PRIVATE KEY-----'),
+      privateKeyInfoToPem: jest.fn(
+        () =>
+          '-----BEGIN PRIVATE KEY-----\nMIIBVgIBADAN\n-----END PRIVATE KEY-----',
+      ),
       certificateToAsn1: jest.fn(() => 'cert-asn1'),
     },
   };
@@ -77,7 +83,9 @@ jest.mock('xml-core', () => ({
 jest.mock('xmldom', () => {
   const mockElement = {
     hasAttribute: jest.fn(() => true),
-    getAttribute: jest.fn((attr: string) => (attr === 'Id' ? 'comprobante' : '')),
+    getAttribute: jest.fn((attr: string) =>
+      attr === 'Id' ? 'comprobante' : '',
+    ),
     setAttribute: jest.fn(),
     appendChild: jest.fn(),
     nodeName: 'factura',
@@ -89,7 +97,9 @@ jest.mock('xmldom', () => {
       })),
     })),
     XMLSerializer: jest.fn(() => ({
-      serializeToString: jest.fn(() => '<factura Id="comprobante"><ds:Signature/></factura>'),
+      serializeToString: jest.fn(
+        () => '<factura Id="comprobante"><ds:Signature/></factura>',
+      ),
     })),
   };
 });
@@ -97,7 +107,10 @@ jest.mock('xmldom', () => {
 jest.mock('@peculiar/webcrypto', () => ({
   Crypto: jest.fn(() => ({
     subtle: {
-      importKey: jest.fn().mockResolvedValue({ type: 'private', algorithm: { name: 'RSASSA-PKCS1-v1_5' } }),
+      importKey: jest.fn().mockResolvedValue({
+        type: 'private',
+        algorithm: { name: 'RSASSA-PKCS1-v1_5' },
+      }),
     },
   })),
 }));
@@ -182,7 +195,10 @@ describe('XmlSignerService', () => {
     });
 
     it('debe retornar true despues de cargar certificado desde buffer', async () => {
-      await service.loadCertificateFromBuffer(Buffer.from('fake-p12'), 'password123');
+      await service.loadCertificateFromBuffer(
+        Buffer.from('fake-p12'),
+        'password123',
+      );
       expect(service.isCertificateLoaded()).toBe(true);
     });
   });
@@ -191,7 +207,10 @@ describe('XmlSignerService', () => {
 
   describe('loadCertificateFromBuffer', () => {
     it('debe cargar certificado P12 desde buffer correctamente', async () => {
-      await service.loadCertificateFromBuffer(Buffer.from('fake-p12'), 'password123');
+      await service.loadCertificateFromBuffer(
+        Buffer.from('fake-p12'),
+        'password123',
+      );
       expect(service.isCertificateLoaded()).toBe(true);
     });
 
@@ -207,7 +226,9 @@ describe('XmlSignerService', () => {
 
       await expect(
         service.loadCertificateFromBuffer(Buffer.from('bad-p12'), 'pass'),
-      ).rejects.toThrow('No se encontró clave privada o certificado en el archivo P12');
+      ).rejects.toThrow(
+        'No se encontró clave privada o certificado en el archivo P12',
+      );
     });
   });
 
@@ -253,14 +274,16 @@ describe('XmlSignerService', () => {
   describe('signXml', () => {
     it('debe firmar XML cuando hay certificado global cargado', async () => {
       await service.loadCertificateFromBuffer(Buffer.from('fake-p12'), 'pass');
-      const result = await service.signXml('<factura Id="comprobante"></factura>');
+      const result = await service.signXml(
+        '<factura Id="comprobante"></factura>',
+      );
       expect(result).toContain('<ds:Signature/>');
     });
 
     it('debe lanzar error cuando no hay certificado global cargado', async () => {
-      await expect(
-        service.signXml('<factura></factura>'),
-      ).rejects.toThrow('No hay certificado cargado');
+      await expect(service.signXml('<factura></factura>')).rejects.toThrow(
+        'No hay certificado cargado',
+      );
     });
   });
 
@@ -285,7 +308,9 @@ describe('XmlSignerService', () => {
         expect.stringContaining('FROM emisores'),
         ['0924383631001'],
       );
-      expect(encryptionService.decrypt).toHaveBeenCalledWith('encrypted:password');
+      expect(encryptionService.decrypt).toHaveBeenCalledWith(
+        'encrypted:password',
+      );
     });
 
     it('debe retornar certificado desde cache en segunda llamada', async () => {
@@ -339,7 +364,9 @@ describe('XmlSignerService', () => {
       await service.loadEmisorCertificate('0924383631001');
 
       // Simular expiración de cache modificando el timestamp
-      const cached = (service as any).emisorCertificateCache.get('0924383631001');
+      const cached = (service as any).emisorCertificateCache.get(
+        '0924383631001',
+      );
       cached.loadedAt = Date.now() - 4000000; // > TTL (1h)
 
       // Segunda carga debe recargar

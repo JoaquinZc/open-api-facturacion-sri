@@ -329,9 +329,9 @@ describe('WebhooksController', () => {
     it('debe lanzar NotFoundException si no pertenece al tenant', async () => {
       db.queryOne.mockResolvedValue(null);
 
-      await expect(
-        controller.delete('wh-uuid-1', tenantUser),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.delete('wh-uuid-1', tenantUser)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -344,7 +344,10 @@ describe('WebhooksController', () => {
         secreto: 'whsec_newregenerated',
       });
 
-      const result = await controller.regenerateSecret('wh-uuid-1', superadminUser);
+      const result = await controller.regenerateSecret(
+        'wh-uuid-1',
+        superadminUser,
+      );
 
       expect(result.secreto).toBe('whsec_newregenerated');
     });
@@ -373,7 +376,12 @@ describe('WebhooksController', () => {
     it('debe retornar logs paginados para SUPERADMIN', async () => {
       webhooksService.getLogs.mockResolvedValue(mockLogsResponse);
 
-      const result = await controller.getLogs('wh-uuid-1', superadminUser, 1, 50);
+      const result = await controller.getLogs(
+        'wh-uuid-1',
+        superadminUser,
+        1,
+        50,
+      );
 
       expect(result.total).toBe(1);
       expect(result.data).toHaveLength(1);
@@ -402,9 +410,9 @@ describe('WebhooksController', () => {
     it('debe lanzar NotFoundException si no pertenece al tenant', async () => {
       db.queryOne.mockResolvedValue({ tenant_id: 'other' } as any);
 
-      await expect(
-        controller.getLogs('wh-uuid-1', tenantUser),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getLogs('wh-uuid-1', tenantUser)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

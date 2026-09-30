@@ -27,7 +27,9 @@ describe('RetencionService — Emisión', () => {
   let base: jest.Mocked<SriBaseService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
 
-  const mockClient = { query: jest.fn().mockResolvedValue({ rows: [{ id: 'row-uuid-1' }] }) };
+  const mockClient = {
+    query: jest.fn().mockResolvedValue({ rows: [{ id: 'row-uuid-1' }] }),
+  };
 
   const mockEmisor = {
     id: 'emisor-uuid-1',
@@ -100,19 +102,27 @@ describe('RetencionService — Emisión', () => {
         {
           provide: ClaveAccesoService,
           useValue: {
-            generate: jest.fn().mockReturnValue('0702202607092438363100110010010000000161245294017'),
+            generate: jest
+              .fn()
+              .mockReturnValue(
+                '0702202607092438363100110010010000000161245294017',
+              ),
           },
         },
         {
           provide: XmlBuilderService,
           useValue: {
-            buildRetencion: jest.fn().mockReturnValue('<retencion>xml</retencion>'),
+            buildRetencion: jest
+              .fn()
+              .mockReturnValue('<retencion>xml</retencion>'),
           },
         },
         {
           provide: XmlSignerService,
           useValue: {
-            signXmlForEmisor: jest.fn().mockResolvedValue('<retencion>signed</retencion>'),
+            signXmlForEmisor: jest
+              .fn()
+              .mockResolvedValue('<retencion>signed</retencion>'),
           },
         },
         {
@@ -130,8 +140,12 @@ describe('RetencionService — Emisión', () => {
             findPuntoEmision: jest.fn().mockResolvedValue(mockPuntoEmision),
             executeInTransaction: jest.fn(),
             getNextSecuencial: jest.fn().mockResolvedValue('000000016'),
-            createComprobante: jest.fn().mockResolvedValue({ id: 'comp-uuid-1' }),
-            createInfoAdicional: jest.fn().mockResolvedValue([{ id: 'info-uuid-1' }]),
+            createComprobante: jest
+              .fn()
+              .mockResolvedValue({ id: 'comp-uuid-1' }),
+            createInfoAdicional: jest
+              .fn()
+              .mockResolvedValue([{ id: 'info-uuid-1' }]),
             saveXml: jest.fn().mockResolvedValue(undefined),
           },
         },
@@ -151,9 +165,13 @@ describe('RetencionService — Emisión', () => {
           provide: SriBaseService,
           useValue: {
             validarIdentificacion: jest.fn(),
-            validarTipoIdentificacionCatalogo: jest.fn().mockResolvedValue(undefined),
+            validarTipoIdentificacionCatalogo: jest
+              .fn()
+              .mockResolvedValue(undefined),
             validarRetencionesCatalogo: jest.fn().mockResolvedValue(undefined),
-            validarDocumentoSustentoCatalogo: jest.fn().mockResolvedValue(undefined),
+            validarDocumentoSustentoCatalogo: jest
+              .fn()
+              .mockResolvedValue(undefined),
             getDefaultAmbiente: jest.fn().mockReturnValue(Ambiente.PRUEBAS),
             // La regla real, con el default del doble: así la prueba ve el orden
             // petición → emisor → configuración sin reimplementarlo.
@@ -195,7 +213,9 @@ describe('RetencionService — Emisión', () => {
   // U-RET-01: Emisión exitosa — SRI autoriza
   // ==========================================
   it('U-RET-01: Emisión exitosa retorna RetencionResponseDto con success=true', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202607092438363100110010010000000161245294017',
@@ -218,12 +238,16 @@ describe('RetencionService — Emisión', () => {
   // U-RET-02: SRI devuelve comprobante (DEVUELTA)
   // ==========================================
   it('U-RET-02: SRI devuelve comprobante → estado=DEVUELTA', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: false,
       claveAcceso: '0702202607092438363100110010010000000161245294017',
       estado: 'DEVUELTA',
-      mensajes: [{ identificador: 'ERROR_1', mensaje: 'Campo inválido', tipo: 'ERROR' }],
+      mensajes: [
+        { identificador: 'ERROR_1', mensaje: 'Campo inválido', tipo: 'ERROR' },
+      ],
     });
 
     const result = await service.emitirRetencion(createValidDto());
@@ -237,12 +261,16 @@ describe('RetencionService — Emisión', () => {
   // U-RET-03: SRI rechaza comprobante (RECHAZADO)
   // ==========================================
   it('U-RET-03: SRI rechaza → estado=RECHAZADO', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: false,
       claveAcceso: '0702202607092438363100110010010000000161245294017',
       estado: 'RECHAZADO',
-      mensajes: [{ identificador: 'ERROR_2', mensaje: 'Firma inválida', tipo: 'ERROR' }],
+      mensajes: [
+        { identificador: 'ERROR_2', mensaje: 'Firma inválida', tipo: 'ERROR' },
+      ],
     });
 
     const result = await service.emitirRetencion(createValidDto());
@@ -269,7 +297,9 @@ describe('RetencionService — Emisión', () => {
       certificado_p12: null,
     } as any);
 
-    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
@@ -278,14 +308,18 @@ describe('RetencionService — Emisión', () => {
   it('U-RET-06: Punto de emisión no encontrado → lanza BadRequestException', async () => {
     repository.findPuntoEmision.mockResolvedValue(null as any);
 
-    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
   // U-RET-07: Secuencial manual se respeta
   // ==========================================
   it('U-RET-07: Secuencial manual se respeta y no consulta BD', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202607092438363100110010010000000161245294017',
@@ -311,7 +345,9 @@ describe('RetencionService — Emisión', () => {
       throw new BadRequestException('RUC inválido');
     });
 
-    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
     expect(repository.findEmisorByRuc).not.toHaveBeenCalled();
   });
 
@@ -323,7 +359,9 @@ describe('RetencionService — Emisión', () => {
       new BadRequestException('Códigos de retención inválidos'),
     );
 
-    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
@@ -334,14 +372,18 @@ describe('RetencionService — Emisión', () => {
       new BadRequestException('Código de documento sustento inválido'),
     );
 
-    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
   // U-RET-11: Clave de acceso generada con tipo RETENCION (07)
   // ==========================================
   it('U-RET-11: Clave de acceso se genera con tipoComprobante=07', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202607092438363100110010010000000161245294017',
@@ -365,7 +407,9 @@ describe('RetencionService — Emisión', () => {
   // U-RET-12: XML se construye y firma
   // ==========================================
   it('U-RET-12: XML se construye y se firma con certificado del emisor', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202607092438363100110010010000000161245294017',
@@ -388,8 +432,12 @@ describe('RetencionService — Emisión', () => {
   // U-RET-13: Persistencia fallida emite evento persistencia_fallida
   // ==========================================
   it('U-RET-13: Falla en persistencia emite comprobante.persistencia_fallida', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
-    repository.createComprobante.mockRejectedValue(new Error('DB connection lost'));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
+    repository.createComprobante.mockRejectedValue(
+      new Error('DB connection lost'),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202607092438363100110010010000000161245294017',
@@ -399,7 +447,9 @@ describe('RetencionService — Emisión', () => {
       mensajes: [],
     });
 
-    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow('DB connection lost');
+    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(
+      'DB connection lost',
+    );
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'comprobante.persistencia_fallida',
@@ -415,7 +465,9 @@ describe('RetencionService — Emisión', () => {
   // U-RET-14: Ambiente por defecto cuando no se especifica
   // ==========================================
   it('U-RET-14: Sin ambiente en la petición, usa el del emisor', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202607092438363100110010010000000161245294017',
@@ -496,14 +548,18 @@ describe('RetencionService — Emisión', () => {
   it('U-RET-16: SRI timeout → relanza error', async () => {
     sriSoapClient.enviarYAutorizar.mockRejectedValue(new Error('SRI timeout'));
 
-    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow('SRI timeout');
+    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(
+      'SRI timeout',
+    );
   });
 
   // ==========================================
   // U-RET-17: Info adicional se persiste cuando existe
   // ==========================================
   it('U-RET-17: Info adicional se persiste cuando existe en el DTO', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202607092438363100110010010000000161245294017',
