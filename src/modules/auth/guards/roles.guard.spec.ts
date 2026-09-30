@@ -50,7 +50,9 @@ describe('RolesGuard', () => {
   it('debe retornar true si no hay roles requeridos', () => {
     reflector.getAllAndOverride.mockReturnValueOnce(undefined);
 
-    const result = guard.canActivate(mockContext({ ...mockUser, rol: UserRole.USER }));
+    const result = guard.canActivate(
+      mockContext({ ...mockUser, rol: UserRole.USER }),
+    );
 
     expect(result).toBe(true);
   });
@@ -58,7 +60,9 @@ describe('RolesGuard', () => {
   it('debe retornar true si no hay roles requeridos (array vacío)', () => {
     reflector.getAllAndOverride.mockReturnValueOnce([]);
 
-    const result = guard.canActivate(mockContext({ ...mockUser, rol: UserRole.USER }));
+    const result = guard.canActivate(
+      mockContext({ ...mockUser, rol: UserRole.USER }),
+    );
 
     expect(result).toBe(true);
   });
@@ -86,18 +90,27 @@ describe('RolesGuard', () => {
       tenantId: 'tenant-abc',
     };
 
-    expect(() => guard.canActivate(mockContext(user))).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(mockContext(user))).toThrow(
+      ForbiddenException,
+    );
   });
 
   it('debe lanzar ForbiddenException si no hay usuario en el request', () => {
     reflector.getAllAndOverride.mockReturnValue([UserRole.SUPERADMIN]);
 
-    expect(() => guard.canActivate(mockContext(null))).toThrow(ForbiddenException);
-    expect(() => guard.canActivate(mockContext(null))).toThrow('No tienes permisos para acceder a este recurso');
+    expect(() => guard.canActivate(mockContext(null))).toThrow(
+      ForbiddenException,
+    );
+    expect(() => guard.canActivate(mockContext(null))).toThrow(
+      'No tienes permisos para acceder a este recurso',
+    );
   });
 
   it('debe permitir acceso si el usuario tiene cualquiera de los roles requeridos', () => {
-    reflector.getAllAndOverride.mockReturnValueOnce([UserRole.SUPERADMIN, UserRole.ADMIN]);
+    reflector.getAllAndOverride.mockReturnValueOnce([
+      UserRole.SUPERADMIN,
+      UserRole.ADMIN,
+    ]);
     const adminUser: JwtPayload = {
       sub: 'admin-1',
       email: 'admin@test.com',
@@ -119,11 +132,16 @@ describe('RolesGuard', () => {
       tenantId: 'tenant-abc',
     };
 
-    expect(() => guard.canActivate(mockContext(regularUser))).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(mockContext(regularUser))).toThrow(
+      ForbiddenException,
+    );
   });
 
   it('debe incluir los roles requeridos en el mensaje de error', () => {
-    reflector.getAllAndOverride.mockReturnValueOnce([UserRole.SUPERADMIN, UserRole.ADMIN]);
+    reflector.getAllAndOverride.mockReturnValueOnce([
+      UserRole.SUPERADMIN,
+      UserRole.ADMIN,
+    ]);
     const user: JwtPayload = {
       sub: 'user-1',
       email: 'user@test.com',

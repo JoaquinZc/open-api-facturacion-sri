@@ -1,5 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, ExecutionContext, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  ExecutionContext,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -113,7 +119,9 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
           useValue: {
             listarComprobantes: jest.fn().mockResolvedValue(mockPaginated),
             obtenerComprobante: jest.fn().mockResolvedValue(mockDetalle),
-            obtenerXmlAutorizado: jest.fn().mockResolvedValue('<?xml version="1.0"?><factura/>'),
+            obtenerXmlAutorizado: jest
+              .fn()
+              .mockResolvedValue('<?xml version="1.0"?><factura/>'),
             anularComprobante: jest.fn().mockResolvedValue({
               message: 'Comprobante anulado exitosamente',
               claveAcceso,
@@ -133,7 +141,11 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
           useValue: {
             validateRucAccess: jest.fn().mockResolvedValue(undefined),
             findByTenantId: jest.fn().mockResolvedValue([
-              { id: 'emisor-1', ruc: rucFromClave, razon_social: 'Empresa Test' },
+              {
+                id: 'emisor-1',
+                ruc: rucFromClave,
+                razon_social: 'Empresa Test',
+              },
             ]),
           },
         },
@@ -206,13 +218,19 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
     });
 
     it('I-CONS-02: pasa filtros por query string correctamente', async () => {
-      const { appInstance, moduleFixture } = await createAppWithUser(superadminUser);
+      const { appInstance, moduleFixture } =
+        await createAppWithUser(superadminUser);
       app = appInstance as any;
       sriService = moduleFixture.get(SriService);
 
       await request(app.getHttpServer())
         .get('/sri/comprobantes')
-        .query({ estado: 'AUTORIZADO', tipoComprobante: '01', page: 1, limit: 10 })
+        .query({
+          estado: 'AUTORIZADO',
+          tipoComprobante: '01',
+          page: 1,
+          limit: 10,
+        })
         .expect(200);
 
       expect(sriService.listarComprobantes).toHaveBeenCalledWith(
@@ -231,9 +249,7 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
       sriService = moduleFixture.get(SriService);
       emisoresService = moduleFixture.get(EmisoresService);
 
-      await request(app.getHttpServer())
-        .get('/sri/comprobantes')
-        .expect(200);
+      await request(app.getHttpServer()).get('/sri/comprobantes').expect(200);
 
       expect(emisoresService.findByTenantId).toHaveBeenCalledWith('tenant-abc');
       expect(sriService.listarComprobantes).toHaveBeenCalledWith(
@@ -253,7 +269,10 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
         .query({ rucEmisor: rucFromClave })
         .expect(200);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, adminUser);
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        adminUser,
+      );
     });
 
     it('I-CONS-05: ADMIN con rucEmisor ajeno retorna 403', async () => {
@@ -311,7 +330,8 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
     });
 
     it('I-CONS-09: comprobante no encontrado retorna 404', async () => {
-      const { appInstance, moduleFixture } = await createAppWithUser(superadminUser);
+      const { appInstance, moduleFixture } =
+        await createAppWithUser(superadminUser);
       app = appInstance as any;
       sriService = moduleFixture.get(SriService);
       (sriService.obtenerComprobante as jest.Mock).mockResolvedValueOnce(null);
@@ -357,15 +377,20 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
         .expect(200);
 
       expect(res.headers['content-type']).toContain('application/xml');
-      expect(res.headers['content-disposition']).toContain(`${claveAcceso}.xml`);
+      expect(res.headers['content-disposition']).toContain(
+        `${claveAcceso}.xml`,
+      );
       expect(res.text).toContain('<?xml');
     });
 
     it('I-CONS-13: XML no disponible retorna 404', async () => {
-      const { appInstance, moduleFixture } = await createAppWithUser(superadminUser);
+      const { appInstance, moduleFixture } =
+        await createAppWithUser(superadminUser);
       app = appInstance as any;
       sriService = moduleFixture.get(SriService);
-      (sriService.obtenerXmlAutorizado as jest.Mock).mockResolvedValueOnce(null);
+      (sriService.obtenerXmlAutorizado as jest.Mock).mockResolvedValueOnce(
+        null,
+      );
 
       await request(app.getHttpServer())
         .get(`/sri/comprobantes/${claveAcceso}/xml`)
@@ -404,7 +429,8 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
     });
 
     it('I-CONS-16: anular comprobante autorizado retorna 400', async () => {
-      const { appInstance, moduleFixture } = await createAppWithUser(superadminUser);
+      const { appInstance, moduleFixture } =
+        await createAppWithUser(superadminUser);
       app = appInstance as any;
       sriService = moduleFixture.get(SriService);
       (sriService.anularComprobante as jest.Mock).mockRejectedValueOnce(
@@ -419,7 +445,8 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
     });
 
     it('I-CONS-17: comprobante no encontrado al anular retorna 400', async () => {
-      const { appInstance, moduleFixture } = await createAppWithUser(superadminUser);
+      const { appInstance, moduleFixture } =
+        await createAppWithUser(superadminUser);
       app = appInstance as any;
       sriService = moduleFixture.get(SriService);
       (sriService.anularComprobante as jest.Mock).mockRejectedValueOnce(
@@ -463,7 +490,8 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
     });
 
     it('I-CONS-20: reintentar comprobante no encontrado retorna error', async () => {
-      const { appInstance, moduleFixture } = await createAppWithUser(superadminUser);
+      const { appInstance, moduleFixture } =
+        await createAppWithUser(superadminUser);
       app = appInstance as any;
       sriService = moduleFixture.get(SriService);
       (sriService.reintentarComprobante as jest.Mock).mockRejectedValueOnce(
@@ -535,7 +563,8 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
   // ==========================================
   describe('POST /sri/sincronizar', () => {
     it('I-CONS-25: SUPERADMIN sincroniza sin rucEmisor', async () => {
-      const { appInstance, moduleFixture } = await createAppWithUser(superadminUser);
+      const { appInstance, moduleFixture } =
+        await createAppWithUser(superadminUser);
       app = appInstance as any;
       sriService = moduleFixture.get(SriService);
 
@@ -550,11 +579,16 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
     });
 
     it('I-CONS-26: SUPERADMIN sincroniza con filtros', async () => {
-      const { appInstance, moduleFixture } = await createAppWithUser(superadminUser);
+      const { appInstance, moduleFixture } =
+        await createAppWithUser(superadminUser);
       app = appInstance as any;
       sriService = moduleFixture.get(SriService);
 
-      const body = { estados: ['PENDIENTE', 'DEVUELTA'], reintentar: true, limite: 10 };
+      const body = {
+        estados: ['PENDIENTE', 'DEVUELTA'],
+        reintentar: true,
+        limite: 10,
+      };
 
       await request(app.getHttpServer())
         .post('/sri/sincronizar')
@@ -586,8 +620,13 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
         .send({ rucEmisor: rucFromClave })
         .expect(200);
 
-      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(rucFromClave, adminUser);
-      expect(sriService.sincronizarConSri).toHaveBeenCalledWith({ rucEmisor: rucFromClave });
+      expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+        rucFromClave,
+        adminUser,
+      );
+      expect(sriService.sincronizarConSri).toHaveBeenCalledWith({
+        rucEmisor: rucFromClave,
+      });
     });
 
     it('I-CONS-29: ADMIN con rucEmisor ajeno retorna 403', async () => {

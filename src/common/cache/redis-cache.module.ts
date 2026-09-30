@@ -19,7 +19,8 @@ import { redisStore } from 'cache-manager-ioredis-yet';
       useFactory: async (configService: ConfigService) => {
         const redisHost = configService.getOrThrow<string>('redis.host');
         const redisPort = configService.getOrThrow<number>('redis.port');
-        const redisPassword = configService.get<string>('redis.password') || undefined;
+        const redisPassword =
+          configService.get<string>('redis.password') || undefined;
         const ttl = configService.get<number>('CACHE_TTL_SECONDS', 300);
 
         return {

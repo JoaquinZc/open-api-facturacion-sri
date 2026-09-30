@@ -49,7 +49,12 @@ async function bootstrap() {
       callback(new Error('CORS: Origen no permitido'));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Output-Format'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Tenant-ID',
+      'X-Output-Format',
+    ],
     credentials: true,
   });
 
@@ -68,9 +73,9 @@ async function bootstrap() {
   // ===== SWAGGER — Open API Facturación SRI =====
   if (nodeEnv !== 'production') {
     const swaggerConfig = new DocumentBuilder()
-    .setTitle('Open API Facturación SRI')
-    .setDescription(
-      `## API Enterprise de Facturación Electrónica para el SRI Ecuador
+      .setTitle('Open API Facturación SRI')
+      .setDescription(
+        `## API Enterprise de Facturación Electrónica para el SRI Ecuador
 
 **Multi-tenant** | **XAdES-BES** | **SOAP SRI** | **Webhooks** | **JWT Auth**
 
@@ -83,44 +88,44 @@ Todos los endpoints requieren un token JWT.
 ### 🌐 Ambientes SRI
 - **Pruebas:** Usar \`"ambiente": "1"\` en las peticiones.
 - **Producción:** Usar \`"ambiente": "2"\` (solo cuando el SRI apruebe la cuenta).`,
-    )
-    .setVersion('2.0.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Token JWT obtenido en POST /auth/login',
-      },
-      'JWT',
-    )
-    .addTag('Auth - Autenticación', 'Login, registro y gestión de usuarios')
-    .addTag('Status', 'Estado del servidor y health checks')
-    .addTag(
-      'SRI - Facturación Electrónica',
-      'Emisión y gestión de comprobantes electrónicos (Facturas, NC, ND, Retenciones, Guías)',
-    )
-    .addTag('Emisores', 'Gestión de empresas emisoras de documentos')
-    .addTag(
-      'Emisores - Puntos de Emisión',
-      'Gestión de puntos de emisión (cajas/sucursales)',
-    )
-    .addTag(
-      'Emisores - Secuenciales',
-      'Gestión de secuenciales de comprobantes',
-    )
-    .addTag(
-      'Tenants',
-      'Gestión de inquilinos/clientes del sistema multi-tenant',
-    )
-    .addTag('Certificates', 'Gestión de certificados digitales P12')
-    .addTag('Webhooks', 'Configuración de notificaciones por eventos')
-    .addTag('Generate PDF', 'Generación de PDFs con Carbone.io')
-    .addTag('Documents', 'Generación de documentos multi-formato')
-    .addTag('Templates', 'Gestión de plantillas de documentos')
-    .addTag('Signature', 'Firma digital de PDFs')
-    .addTag('Images', 'Gestión de imágenes')
-    .build();
+      )
+      .setVersion('2.0.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Token JWT obtenido en POST /auth/login',
+        },
+        'JWT',
+      )
+      .addTag('Auth - Autenticación', 'Login, registro y gestión de usuarios')
+      .addTag('Status', 'Estado del servidor y health checks')
+      .addTag(
+        'SRI - Facturación Electrónica',
+        'Emisión y gestión de comprobantes electrónicos (Facturas, NC, ND, Retenciones, Guías)',
+      )
+      .addTag('Emisores', 'Gestión de empresas emisoras de documentos')
+      .addTag(
+        'Emisores - Puntos de Emisión',
+        'Gestión de puntos de emisión (cajas/sucursales)',
+      )
+      .addTag(
+        'Emisores - Secuenciales',
+        'Gestión de secuenciales de comprobantes',
+      )
+      .addTag(
+        'Tenants',
+        'Gestión de inquilinos/clientes del sistema multi-tenant',
+      )
+      .addTag('Certificates', 'Gestión de certificados digitales P12')
+      .addTag('Webhooks', 'Configuración de notificaciones por eventos')
+      .addTag('Generate PDF', 'Generación de PDFs con Carbone.io')
+      .addTag('Documents', 'Generación de documentos multi-formato')
+      .addTag('Templates', 'Gestión de plantillas de documentos')
+      .addTag('Signature', 'Firma digital de PDFs')
+      .addTag('Images', 'Gestión de imágenes')
+      .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('api', app, document, {

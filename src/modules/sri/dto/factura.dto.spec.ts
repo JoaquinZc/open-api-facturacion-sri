@@ -8,7 +8,12 @@ import {
   PagoDto,
   CampoAdicionalDto,
 } from './common.dto';
-import { Ambiente, TipoEmision, TipoIdentificacion, FormaPago } from '../constants';
+import {
+  Ambiente,
+  TipoEmision,
+  TipoIdentificacion,
+  FormaPago,
+} from '../constants';
 
 /**
  * Tests unitarios para la validación de CreateFacturaDto y sus DTOs anidados.
@@ -155,7 +160,9 @@ describe('CreateFacturaDto — Validación', () => {
     const detallesErrors = errors.find((e) => e.property === 'detalles');
     expect(detallesErrors).toBeDefined();
     // Array items are nested: children[0] = first array element, then .children for property errors
-    const itemErrors = (detallesErrors?.children || []).flatMap((c) => c.children || []);
+    const itemErrors = (detallesErrors?.children || []).flatMap(
+      (c) => c.children || [],
+    );
     const descError = itemErrors.find((c) => c.property === 'descripcion');
     expect(descError).toBeDefined();
   });
@@ -169,7 +176,9 @@ describe('CreateFacturaDto — Validación', () => {
     const errors = await validate(dto);
     const detallesErrors = errors.find((e) => e.property === 'detalles');
     expect(detallesErrors).toBeDefined();
-    const itemErrors = (detallesErrors?.children || []).flatMap((c) => c.children || []);
+    const itemErrors = (detallesErrors?.children || []).flatMap(
+      (c) => c.children || [],
+    );
     const cantError = itemErrors.find((c) => c.property === 'cantidad');
     expect(cantError).toBeDefined();
     const constraintKeys = Object.keys(cantError?.constraints || {});
@@ -185,7 +194,9 @@ describe('CreateFacturaDto — Validación', () => {
     const errors = await validate(dto);
     const detallesErrors = errors.find((e) => e.property === 'detalles');
     expect(detallesErrors).toBeDefined();
-    const itemErrors = (detallesErrors?.children || []).flatMap((c) => c.children || []);
+    const itemErrors = (detallesErrors?.children || []).flatMap(
+      (c) => c.children || [],
+    );
     const precioError = itemErrors.find((c) => c.property === 'precioUnitario');
     expect(precioError).toBeDefined();
     const constraintKeys = Object.keys(precioError?.constraints || {});
@@ -211,7 +222,9 @@ describe('CreateFacturaDto — Validación', () => {
     const errors = await validate(dto);
     const pagosErrors = errors.find((e) => e.property === 'pagos');
     expect(pagosErrors).toBeDefined();
-    const itemErrors = (pagosErrors?.children || []).flatMap((c) => c.children || []);
+    const itemErrors = (pagosErrors?.children || []).flatMap(
+      (c) => c.children || [],
+    );
     const formaPagoError = itemErrors.find((c) => c.property === 'formaPago');
     expect(formaPagoError).toBeDefined();
   });
@@ -292,7 +305,9 @@ describe('EmisorDto — Validación', () => {
     const emisor = createValidEmisor();
     (emisor as any).obligadoContabilidad = 'TALVEZ';
     const errors = await validate(emisor);
-    expect(errors.some((e) => e.property === 'obligadoContabilidad')).toBe(true);
+    expect(errors.some((e) => e.property === 'obligadoContabilidad')).toBe(
+      true,
+    );
   });
 });
 

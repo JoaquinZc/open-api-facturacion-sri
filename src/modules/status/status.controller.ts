@@ -39,8 +39,14 @@ export class StatusController {
   })
   async getStatus() {
     // Thresholds de memoria desde configuración
-    const heapMb = this.configService.get<number>('healthChecks.memoryHeapMb', 150);
-    const rssMb  = this.configService.get<number>('healthChecks.memoryRssMb', 300);
+    const heapMb = this.configService.get<number>(
+      'healthChecks.memoryHeapMb',
+      150,
+    );
+    const rssMb = this.configService.get<number>(
+      'healthChecks.memoryRssMb',
+      300,
+    );
 
     // Info base estática
     const baseInfo = this.statusService.getStatus();
@@ -50,7 +56,7 @@ export class StatusController {
       () => this.db.isHealthy('database'),
       () => this.redis.isHealthy('redis'),
       () => this.memory.checkHeap('memory_heap', heapMb * 1024 * 1024),
-      () => this.memory.checkRSS('memory_rss',  rssMb  * 1024 * 1024),
+      () => this.memory.checkRSS('memory_rss', rssMb * 1024 * 1024),
       () => this.sri.isHealthy('sri_soap'),
     ]);
 

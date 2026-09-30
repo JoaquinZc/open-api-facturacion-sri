@@ -289,15 +289,19 @@ export class RetencionService {
             comprobante_id: comprobante.id!,
             xml_firmado_path: xmlPaths.firmado?.path ?? null,
             xml_autorizado_path: xmlPaths.autorizado?.path ?? null,
-          // Solo viene con valor si la subida falló; ver XmlStorageService.
-          xml_firmado_contenido: xmlPaths.firmado?.contenido ?? null,
-          xml_autorizado_contenido: xmlPaths.autorizado?.contenido ?? null,
+            // Solo viene con valor si la subida falló; ver XmlStorageService.
+            xml_firmado_contenido: xmlPaths.firmado?.contenido ?? null,
+            xml_autorizado_contenido: xmlPaths.autorizado?.contenido ?? null,
           },
           client,
         );
 
         // 4. Create info adicional (from comprobante + SRI messages if rejected)
-        const infoAdicionalRecords: { comprobante_id: string; nombre: string; valor: string }[] = [];
+        const infoAdicionalRecords: {
+          comprobante_id: string;
+          nombre: string;
+          valor: string;
+        }[] = [];
 
         if (retencion.infoAdicional && retencion.infoAdicional.length > 0) {
           infoAdicionalRecords.push(
@@ -434,7 +438,8 @@ export class RetencionService {
     }
 
     // Resolución NAC-DGERCGC26-00000027: RUC del proveedor del sistema
-    const infoAdicionalFinal = await this.base.injectProveedorRucInfoAdicional(infoAdicional);
+    const infoAdicionalFinal =
+      await this.base.injectProveedorRucInfoAdicional(infoAdicional);
 
     if (infoAdicionalFinal.length > 0) {
       retencion.infoAdicional = infoAdicionalFinal;

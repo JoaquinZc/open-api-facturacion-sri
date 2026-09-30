@@ -27,7 +27,9 @@ describe('WebhooksService', () => {
   const mockLogRow = {
     id: 'log-uuid-1',
     evento: 'comprobante.autorizado',
-    payload: { claveAcceso: '1234567890123456789012345678901234567890123456789' },
+    payload: {
+      claveAcceso: '1234567890123456789012345678901234567890123456789',
+    },
     status_code: 200,
     respuesta: 'OK',
     intento: 1,
@@ -238,21 +240,29 @@ describe('WebhooksService', () => {
     it('debe actualizar campos proporcionados', async () => {
       db.query
         .mockResolvedValueOnce({ rows: [mockWebhookRow] } as any) // findOne
-        .mockResolvedValueOnce({ rows: [{ ...mockWebhookRow, nombre: 'Webhook Actualizado' }] } as any); // UPDATE
+        .mockResolvedValueOnce({
+          rows: [{ ...mockWebhookRow, nombre: 'Webhook Actualizado' }],
+        } as any); // UPDATE
 
       const result = await service.update('wh-uuid-1', dto);
 
       expect(result.nombre).toBe('Webhook Actualizado');
       expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE webhook_configs SET'),
-        expect.arrayContaining(['Webhook Actualizado', 'https://example.com/updated', 'wh-uuid-1']),
+        expect.arrayContaining([
+          'Webhook Actualizado',
+          'https://example.com/updated',
+          'wh-uuid-1',
+        ]),
       );
     });
 
     it('debe actualizar solo activo', async () => {
       db.query
         .mockResolvedValueOnce({ rows: [mockWebhookRow] } as any) // findOne
-        .mockResolvedValueOnce({ rows: [{ ...mockWebhookRow, activo: false }] } as any); // UPDATE
+        .mockResolvedValueOnce({
+          rows: [{ ...mockWebhookRow, activo: false }],
+        } as any); // UPDATE
 
       const result = await service.update('wh-uuid-1', { activo: false });
 
@@ -287,7 +297,9 @@ describe('WebhooksService', () => {
     it('debe inactivar un webhook activo (soft delete)', async () => {
       db.query
         .mockResolvedValueOnce({ rows: [mockWebhookRow] } as any) // findOne
-        .mockResolvedValueOnce({ rows: [{ ...mockWebhookRow, activo: false }] } as any); // UPDATE
+        .mockResolvedValueOnce({
+          rows: [{ ...mockWebhookRow, activo: false }],
+        } as any); // UPDATE
 
       const result = await service.delete('wh-uuid-1');
 
@@ -399,12 +411,26 @@ describe('WebhooksService', () => {
   describe('emit', () => {
     it('debe encolar jobs en BullMQ para webhooks suscritos', async () => {
       const configs = [
-        { id: 'wh-1', url: 'https://a.com/hook', secreto: 'sec1', reintentos_max: 3 },
-        { id: 'wh-2', url: 'https://b.com/hook', secreto: 'sec2', reintentos_max: 5 },
+        {
+          id: 'wh-1',
+          url: 'https://a.com/hook',
+          secreto: 'sec1',
+          reintentos_max: 3,
+        },
+        {
+          id: 'wh-2',
+          url: 'https://b.com/hook',
+          secreto: 'sec2',
+          reintentos_max: 5,
+        },
       ];
       db.query.mockResolvedValue({ rows: configs } as any);
 
-      await service.emit('comprobante.autorizado', { claveAcceso: '123' }, 'emisor-uuid-1');
+      await service.emit(
+        'comprobante.autorizado',
+        { claveAcceso: '123' },
+        'emisor-uuid-1',
+      );
 
       expect(webhookQueue.add).toHaveBeenCalledTimes(2);
       expect(webhookQueue.add).toHaveBeenCalledWith(
@@ -423,7 +449,14 @@ describe('WebhooksService', () => {
 
     it('debe usar attempts=5 por defecto si reintentos_max es null', async () => {
       db.query.mockResolvedValue({
-        rows: [{ id: 'wh-1', url: 'https://a.com/hook', secreto: 'sec1', reintentos_max: null }],
+        rows: [
+          {
+            id: 'wh-1',
+            url: 'https://a.com/hook',
+            secreto: 'sec1',
+            reintentos_max: null,
+          },
+        ],
       } as any);
 
       await service.emit('comprobante.rechazado', { claveAcceso: '456' });
@@ -446,7 +479,11 @@ describe('WebhooksService', () => {
     it('debe filtrar por emisorId cuando se proporciona', async () => {
       db.query.mockResolvedValue({ rows: [] } as any);
 
-      await service.emit('comprobante.autorizado', { data: 'test' }, 'emisor-uuid-1');
+      await service.emit(
+        'comprobante.autorizado',
+        { data: 'test' },
+        'emisor-uuid-1',
+      );
 
       const queryCall = db.query.mock.calls[0];
       expect(queryCall[0]).toContain('emisor_id IS NULL OR emisor_id = $2');

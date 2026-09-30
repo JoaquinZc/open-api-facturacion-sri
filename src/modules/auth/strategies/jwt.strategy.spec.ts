@@ -72,16 +72,22 @@ describe('JwtStrategy', () => {
         new UnauthorizedException('Token inválido o usuario inactivo'),
       );
 
-      await expect(strategy.validate(mockPayload)).rejects.toThrow(UnauthorizedException);
+      await expect(strategy.validate(mockPayload)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('debe rechazar refresh tokens', async () => {
       const refreshPayload = { ...mockPayload, type: 'refresh' as const };
       authService.validatePayload.mockRejectedValueOnce(
-        new UnauthorizedException('Token de refresco no permitido para acceder a recursos'),
+        new UnauthorizedException(
+          'Token de refresco no permitido para acceder a recursos',
+        ),
       );
 
-      await expect(strategy.validate(refreshPayload)).rejects.toThrow(UnauthorizedException);
+      await expect(strategy.validate(refreshPayload)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('debe validar payload con tenantId', async () => {

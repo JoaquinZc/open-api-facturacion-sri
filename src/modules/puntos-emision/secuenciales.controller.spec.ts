@@ -1,5 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { SecuencialesController } from './secuenciales.controller';
 import { PuntosEmisionService } from './puntos-emision.service';
 import { EmisoresService } from '../emisores/emisores.service';
@@ -74,15 +78,22 @@ describe('SecuencialesController', () => {
   describe('GET /emisores/secuenciales/:emisorId', () => {
     it('debe listar todos los secuenciales del emisor después de validar acceso', async () => {
       emisoresService.validateEmisorAccess.mockResolvedValueOnce({} as any);
-      service.getAllSecuencialesByEmisor.mockResolvedValueOnce([mockSecuencialWithEstab]);
+      service.getAllSecuencialesByEmisor.mockResolvedValueOnce([
+        mockSecuencialWithEstab,
+      ]);
 
-      const result = await controller.getAllByEmisor('emisor-uuid-1', tenantUser);
+      const result = await controller.getAllByEmisor(
+        'emisor-uuid-1',
+        tenantUser,
+      );
 
       expect(emisoresService.validateEmisorAccess).toHaveBeenCalledWith(
         'emisor-uuid-1',
         tenantUser,
       );
-      expect(service.getAllSecuencialesByEmisor).toHaveBeenCalledWith('emisor-uuid-1');
+      expect(service.getAllSecuencialesByEmisor).toHaveBeenCalledWith(
+        'emisor-uuid-1',
+      );
       expect(result).toHaveLength(1);
       expect(result[0].establecimiento).toBe('001');
     });
@@ -106,13 +117,20 @@ describe('SecuencialesController', () => {
       emisoresService.validateEmisorAccess.mockResolvedValueOnce({} as any);
       service.getSecuenciales.mockResolvedValueOnce([mockSecuencialResponse]);
 
-      const result = await controller.getSecuenciales('emisor-uuid-1', 'pe-uuid-1', superadminUser);
+      const result = await controller.getSecuenciales(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+        superadminUser,
+      );
 
       expect(emisoresService.validateEmisorAccess).toHaveBeenCalledWith(
         'emisor-uuid-1',
         superadminUser,
       );
-      expect(service.getSecuenciales).toHaveBeenCalledWith('emisor-uuid-1', 'pe-uuid-1');
+      expect(service.getSecuenciales).toHaveBeenCalledWith(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+      );
       expect(result).toHaveLength(1);
       expect(result[0].tipoComprobante).toBe('01');
     });
@@ -124,7 +142,11 @@ describe('SecuencialesController', () => {
       );
 
       await expect(
-        controller.getSecuenciales('emisor-uuid-1', 'non-existent', superadminUser),
+        controller.getSecuenciales(
+          'emisor-uuid-1',
+          'non-existent',
+          superadminUser,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -170,7 +192,13 @@ describe('SecuencialesController', () => {
       );
 
       await expect(
-        controller.updateSecuencial('emisor-uuid-1', 'pe-uuid-1', '99', updateDto, superadminUser),
+        controller.updateSecuencial(
+          'emisor-uuid-1',
+          'pe-uuid-1',
+          '99',
+          updateDto,
+          superadminUser,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -181,7 +209,13 @@ describe('SecuencialesController', () => {
       );
 
       await expect(
-        controller.updateSecuencial('emisor-uuid-1', 'pe-uuid-1', '07', updateDto, superadminUser),
+        controller.updateSecuencial(
+          'emisor-uuid-1',
+          'pe-uuid-1',
+          '07',
+          updateDto,
+          superadminUser,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -191,7 +225,13 @@ describe('SecuencialesController', () => {
       );
 
       await expect(
-        controller.updateSecuencial('emisor-uuid-1', 'pe-uuid-1', '01', updateDto, tenantUser),
+        controller.updateSecuencial(
+          'emisor-uuid-1',
+          'pe-uuid-1',
+          '01',
+          updateDto,
+          tenantUser,
+        ),
       ).rejects.toThrow(ForbiddenException);
       expect(service.updateSecuencial).not.toHaveBeenCalled();
     });

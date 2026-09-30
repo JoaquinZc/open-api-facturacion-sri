@@ -37,17 +37,20 @@ export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar tenants con paginación keyset y filtros (solo SUPERADMIN)' })
+  @ApiOperation({
+    summary: 'Listar tenants con paginación keyset y filtros (solo SUPERADMIN)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista paginada de tenants',
     type: PaginatedTenantsResponseDto,
   })
   @ApiResponse({ status: 403, description: 'Se requiere rol SUPERADMIN' })
-  async findAll(@Query() query: QueryTenantsDto): Promise<PaginatedTenantsResponseDto> {
+  async findAll(
+    @Query() query: QueryTenantsDto,
+  ): Promise<PaginatedTenantsResponseDto> {
     return this.tenantsService.findAll(query);
   }
-
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un tenant por ID (solo SUPERADMIN)' })
@@ -57,7 +60,9 @@ export class TenantsController {
     type: TenantResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Tenant no encontrado' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<TenantResponseDto> {
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<TenantResponseDto> {
     return this.tenantsService.findOne(id);
   }
 
@@ -96,7 +101,9 @@ export class TenantsController {
   })
   @ApiResponse({ status: 400, description: 'Tenant ya está inactivo' })
   @ApiResponse({ status: 404, description: 'Tenant no encontrado' })
-  async delete(@Param('id', ParseUUIDPipe) id: string): Promise<TenantResponseDto> {
+  async delete(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<TenantResponseDto> {
     return this.tenantsService.delete(id);
   }
 }

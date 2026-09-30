@@ -1,4 +1,9 @@
-import { Injectable, Logger, Inject, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Inject,
+  BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
@@ -170,19 +175,25 @@ export class SriRepositoryService {
   ): Promise<{ punto_emision_id: string; establecimiento_id: string } | null> {
     // Verificar cache Redis distribuido
     const cacheKey = `punto-emision:${emisorId}:${establecimiento}:${puntoEmision}`;
-    const cached = await this.cacheManager.get<{ punto_emision_id: string; establecimiento_id: string }>(cacheKey);
+    const cached = await this.cacheManager.get<{
+      punto_emision_id: string;
+      establecimiento_id: string;
+    }>(cacheKey);
     if (cached) {
       return cached;
     }
 
     // Query database
-    const result = await this.db.queryOne<{ punto_emision_id: string; establecimiento_id: string }>(
+    const result = await this.db.queryOne<{
+      punto_emision_id: string;
+      establecimiento_id: string;
+    }>(
       `SELECT pe.id as punto_emision_id, e.id as establecimiento_id
        FROM puntos_emision pe
        JOIN establecimientos e ON pe.establecimiento_id = e.id
        WHERE e.emisor_id = $1 AND e.codigo = $2 AND pe.codigo = $3
        AND e.estado = 'ACTIVO' AND pe.estado = 'ACTIVO'`,
-       [emisorId, establecimiento, puntoEmision],
+      [emisorId, establecimiento, puntoEmision],
     );
 
     // Guardar en cache Redis si fue encontrado
@@ -546,7 +557,9 @@ export class SriRepositoryService {
         const cursorData = JSON.parse(jsonStr);
         if (cursorData && cursorData.createdAt && cursorData.id) {
           // c.created_at y c.id son menores que el cursor (orden descendente)
-          conditions.push(`(c.created_at, c.id) < ($${paramIndex++}, $${paramIndex++})`);
+          conditions.push(
+            `(c.created_at, c.id) < ($${paramIndex++}, $${paramIndex++})`,
+          );
           params.push(new Date(cursorData.createdAt), cursorData.id);
         }
       } catch (err) {
@@ -574,7 +587,10 @@ export class SriRepositoryService {
          ${whereClause}`,
         params.slice(0, filterParamsCount),
       );
-      total = countResult.rows.length > 0 ? parseInt(countResult.rows[0].count, 10) : 0;
+      total =
+        countResult.rows.length > 0
+          ? parseInt(countResult.rows[0].count, 10)
+          : 0;
     }
 
     const dataResult = await this.db.query<any>(
@@ -612,7 +628,6 @@ export class SriRepositoryService {
 
     return { data: dataResult.rows, total };
   }
-
 
   /**
    * Busca un comprobante por clave de acceso con info de XML disponible

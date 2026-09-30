@@ -11,11 +11,21 @@ import {
   Logger,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/dto/auth.dto';
 import { CatalogosAdminService } from './catalogos-admin.service';
-import { CreateRetencionDto, UpdateRetencionDto, RetencionResponseDto } from './dto/catalogo-retencion.dto';
+import {
+  CreateRetencionDto,
+  UpdateRetencionDto,
+  RetencionResponseDto,
+} from './dto/catalogo-retencion.dto';
 
 @ApiTags('Catálogos Admin')
 @ApiBearerAuth()
@@ -28,9 +38,16 @@ export class CatalogosAdminController {
 
   @Get('retenciones')
   @ApiOperation({ summary: 'Listar todas las retenciones (incluye inactivas)' })
-  @ApiQuery({ name: 'includeInactive', required: false, type: Boolean, description: 'Incluir retenciones inactivas' })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    type: Boolean,
+    description: 'Incluir retenciones inactivas',
+  })
   @ApiResponse({ status: 200, type: [RetencionResponseDto] })
-  async listRetenciones(@Query('includeInactive') includeInactive?: string): Promise<RetencionResponseDto[]> {
+  async listRetenciones(
+    @Query('includeInactive') includeInactive?: string,
+  ): Promise<RetencionResponseDto[]> {
     const include = includeInactive === 'true' || includeInactive === '1';
     return this.adminService.findAllRetenciones(include);
   }
@@ -38,15 +55,21 @@ export class CatalogosAdminController {
   @Get('retenciones/:id')
   @ApiOperation({ summary: 'Obtener una retención por ID' })
   @ApiResponse({ status: 200, type: RetencionResponseDto })
-  async getRetencion(@Param('id', ParseUUIDPipe) id: string): Promise<RetencionResponseDto> {
+  async getRetencion(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<RetencionResponseDto> {
     return this.adminService.findRetencionById(id);
   }
 
   @Post('retenciones')
   @ApiOperation({ summary: 'Crear una nueva retención' })
   @ApiResponse({ status: 201, type: RetencionResponseDto })
-  async createRetencion(@Body() dto: CreateRetencionDto): Promise<RetencionResponseDto> {
-    this.logger.log(`POST /catalogos/admin/retenciones - ${dto.tipo}-${dto.codigo}`);
+  async createRetencion(
+    @Body() dto: CreateRetencionDto,
+  ): Promise<RetencionResponseDto> {
+    this.logger.log(
+      `POST /catalogos/admin/retenciones - ${dto.tipo}-${dto.codigo}`,
+    );
     return this.adminService.createRetencion(dto);
   }
 

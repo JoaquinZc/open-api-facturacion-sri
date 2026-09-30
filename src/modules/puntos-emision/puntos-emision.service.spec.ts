@@ -194,9 +194,9 @@ describe('PuntosEmisionService', () => {
     it('debe lanzar NotFoundException si el emisor no existe', async () => {
       db.queryOne.mockResolvedValueOnce(null);
 
-      await expect(
-        service.create('non-existent', createDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create('non-existent', createDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('debe lanzar ConflictException si el punto ya existe', async () => {
@@ -204,9 +204,9 @@ describe('PuntosEmisionService', () => {
         .mockResolvedValueOnce({ id: 'emisor-uuid-1' } as any)
         .mockResolvedValueOnce({ id: 'pe-existing' } as any);
 
-      await expect(
-        service.create('emisor-uuid-1', createDto),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.create('emisor-uuid-1', createDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -237,7 +237,11 @@ describe('PuntosEmisionService', () => {
           rows: [{ tipo_comprobante: '01', ultimo_secuencial: '5' }],
         } as any);
 
-      const result = await service.update('emisor-uuid-1', 'pe-uuid-1', updateDto);
+      const result = await service.update(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+        updateDto,
+      );
 
       expect(result.id).toBe('pe-uuid-1');
       // Verificar que se actualizó establecimiento
@@ -264,17 +268,22 @@ describe('PuntosEmisionService', () => {
           rows: [{ tipo_comprobante: '01', ultimo_secuencial: '5' }],
         } as any);
 
-      const result = await service.update('emisor-uuid-1', 'pe-uuid-1', partialDto);
+      const result = await service.update(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+        partialDto,
+      );
 
       expect(result.id).toBe('pe-uuid-1');
     });
 
     it('debe lanzar NotFoundException si el punto no existe', async () => {
-      db.query
-        .mockResolvedValueOnce({ rows: [] } as any); // findOne → no existe
+      db.query.mockResolvedValueOnce({ rows: [] } as any); // findOne → no existe
 
       await expect(
-        service.update('emisor-uuid-1', 'non-existent', { descripcion: 'test' }),
+        service.update('emisor-uuid-1', 'non-existent', {
+          descripcion: 'test',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -293,7 +302,9 @@ describe('PuntosEmisionService', () => {
       db.query.mockResolvedValueOnce({ rows: [] } as any);
       // findOne retorno
       db.query
-        .mockResolvedValueOnce({ rows: [{ ...mockPuntoRow, estado: 'INACTIVO' }] } as any)
+        .mockResolvedValueOnce({
+          rows: [{ ...mockPuntoRow, estado: 'INACTIVO' }],
+        } as any)
         .mockResolvedValueOnce({
           rows: [{ tipo_comprobante: '01', ultimo_secuencial: '5' }],
         } as any);
@@ -387,12 +398,23 @@ describe('PuntosEmisionService', () => {
       // getSecuenciales query
       db.query.mockResolvedValueOnce({
         rows: [
-          { ...mockSecuencialRow, tipo_comprobante: '01', ultimo_secuencial: '5' },
-          { ...mockSecuencialRow, tipo_comprobante: '04', ultimo_secuencial: '2' },
+          {
+            ...mockSecuencialRow,
+            tipo_comprobante: '01',
+            ultimo_secuencial: '5',
+          },
+          {
+            ...mockSecuencialRow,
+            tipo_comprobante: '04',
+            ultimo_secuencial: '2',
+          },
         ],
       } as any);
 
-      const result = await service.getSecuenciales('emisor-uuid-1', 'pe-uuid-1');
+      const result = await service.getSecuenciales(
+        'emisor-uuid-1',
+        'pe-uuid-1',
+      );
 
       expect(result).toHaveLength(2);
       expect(result[0].tipoComprobante).toBe('01');

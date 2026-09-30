@@ -27,7 +27,9 @@ describe('GuiaRemisionService — Emisión', () => {
   let base: jest.Mocked<SriBaseService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
 
-  const mockClient = { query: jest.fn().mockResolvedValue({ rows: [{ id: 'row-uuid-1' }] }) };
+  const mockClient = {
+    query: jest.fn().mockResolvedValue({ rows: [{ id: 'row-uuid-1' }] }),
+  };
 
   const mockEmisor = {
     id: 'emisor-uuid-1',
@@ -92,19 +94,27 @@ describe('GuiaRemisionService — Emisión', () => {
         {
           provide: ClaveAccesoService,
           useValue: {
-            generate: jest.fn().mockReturnValue('0702202606092438363100110010010000000161245294016'),
+            generate: jest
+              .fn()
+              .mockReturnValue(
+                '0702202606092438363100110010010000000161245294016',
+              ),
           },
         },
         {
           provide: XmlBuilderService,
           useValue: {
-            buildGuiaRemision: jest.fn().mockReturnValue('<guiaRemision>xml</guiaRemision>'),
+            buildGuiaRemision: jest
+              .fn()
+              .mockReturnValue('<guiaRemision>xml</guiaRemision>'),
           },
         },
         {
           provide: XmlSignerService,
           useValue: {
-            signXmlForEmisor: jest.fn().mockResolvedValue('<guiaRemision>signed</guiaRemision>'),
+            signXmlForEmisor: jest
+              .fn()
+              .mockResolvedValue('<guiaRemision>signed</guiaRemision>'),
           },
         },
         {
@@ -122,8 +132,12 @@ describe('GuiaRemisionService — Emisión', () => {
             findPuntoEmision: jest.fn().mockResolvedValue(mockPuntoEmision),
             executeInTransaction: jest.fn(),
             getNextSecuencial: jest.fn().mockResolvedValue('000000016'),
-            createComprobante: jest.fn().mockResolvedValue({ id: 'comp-uuid-1' }),
-            createInfoAdicional: jest.fn().mockResolvedValue([{ id: 'info-uuid-1' }]),
+            createComprobante: jest
+              .fn()
+              .mockResolvedValue({ id: 'comp-uuid-1' }),
+            createInfoAdicional: jest
+              .fn()
+              .mockResolvedValue([{ id: 'info-uuid-1' }]),
             saveXml: jest.fn().mockResolvedValue(undefined),
           },
         },
@@ -143,7 +157,9 @@ describe('GuiaRemisionService — Emisión', () => {
           provide: SriBaseService,
           useValue: {
             validarIdentificacion: jest.fn(),
-            validarTipoIdentificacionCatalogo: jest.fn().mockResolvedValue(undefined),
+            validarTipoIdentificacionCatalogo: jest
+              .fn()
+              .mockResolvedValue(undefined),
             getDefaultAmbiente: jest.fn().mockReturnValue(Ambiente.PRUEBAS),
             // La regla real, con el default del doble: así la prueba ve el orden
             // petición → emisor → configuración sin reimplementarlo.
@@ -185,7 +201,9 @@ describe('GuiaRemisionService — Emisión', () => {
   // U-GR-01: Emisión exitosa — SRI autoriza
   // ==========================================
   it('U-GR-01: Emisión exitosa retorna GuiaRemisionResponseDto con success=true', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202606092438363100110010010000000161245294016',
@@ -208,12 +226,16 @@ describe('GuiaRemisionService — Emisión', () => {
   // U-GR-02: SRI devuelve comprobante (DEVUELTA)
   // ==========================================
   it('U-GR-02: SRI devuelve comprobante → estado=DEVUELTA', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: false,
       claveAcceso: '0702202606092438363100110010010000000161245294016',
       estado: 'DEVUELTA',
-      mensajes: [{ identificador: 'ERROR_1', mensaje: 'Campo inválido', tipo: 'ERROR' }],
+      mensajes: [
+        { identificador: 'ERROR_1', mensaje: 'Campo inválido', tipo: 'ERROR' },
+      ],
     });
 
     const result = await service.emitirGuiaRemision(createValidDto());
@@ -227,12 +249,16 @@ describe('GuiaRemisionService — Emisión', () => {
   // U-GR-03: SRI rechaza comprobante (RECHAZADO)
   // ==========================================
   it('U-GR-03: SRI rechaza → estado=RECHAZADO', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: false,
       claveAcceso: '0702202606092438363100110010010000000161245294016',
       estado: 'RECHAZADO',
-      mensajes: [{ identificador: 'ERROR_2', mensaje: 'Firma inválida', tipo: 'ERROR' }],
+      mensajes: [
+        { identificador: 'ERROR_2', mensaje: 'Firma inválida', tipo: 'ERROR' },
+      ],
     });
 
     const result = await service.emitirGuiaRemision(createValidDto());
@@ -247,7 +273,9 @@ describe('GuiaRemisionService — Emisión', () => {
   it('U-GR-04: Emisor no encontrado → lanza error', async () => {
     repository.findEmisorByRuc.mockResolvedValue(null as any);
 
-    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow();
+    await expect(
+      service.emitirGuiaRemision(createValidDto()),
+    ).rejects.toThrow();
   });
 
   // ==========================================
@@ -259,7 +287,9 @@ describe('GuiaRemisionService — Emisión', () => {
       certificado_p12: null,
     } as any);
 
-    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
@@ -268,14 +298,18 @@ describe('GuiaRemisionService — Emisión', () => {
   it('U-GR-06: Punto de emisión no encontrado → lanza BadRequestException', async () => {
     repository.findPuntoEmision.mockResolvedValue(null as any);
 
-    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
   // U-GR-07: Secuencial manual se respeta
   // ==========================================
   it('U-GR-07: Secuencial manual se respeta y no consulta BD', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202606092438363100110010010000000161245294016',
@@ -301,7 +335,9 @@ describe('GuiaRemisionService — Emisión', () => {
       throw new BadRequestException('RUC inválido');
     });
 
-    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
     expect(repository.findEmisorByRuc).not.toHaveBeenCalled();
   });
 
@@ -309,7 +345,9 @@ describe('GuiaRemisionService — Emisión', () => {
   // U-GR-09: Clave de acceso generada con tipo GUIA_REMISION (06)
   // ==========================================
   it('U-GR-09: Clave de acceso se genera con tipoComprobante=06', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202606092438363100110010010000000161245294016',
@@ -333,7 +371,9 @@ describe('GuiaRemisionService — Emisión', () => {
   // U-GR-10: XML se construye y firma
   // ==========================================
   it('U-GR-10: XML se construye y se firma con certificado del emisor', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202606092438363100110010010000000161245294016',
@@ -356,8 +396,12 @@ describe('GuiaRemisionService — Emisión', () => {
   // U-GR-11: Persistencia fallida emite evento persistencia_fallida
   // ==========================================
   it('U-GR-11: Falla en persistencia emite comprobante.persistencia_fallida', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
-    repository.createComprobante.mockRejectedValue(new Error('DB connection lost'));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
+    repository.createComprobante.mockRejectedValue(
+      new Error('DB connection lost'),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202606092438363100110010010000000161245294016',
@@ -367,7 +411,9 @@ describe('GuiaRemisionService — Emisión', () => {
       mensajes: [],
     });
 
-    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow('DB connection lost');
+    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow(
+      'DB connection lost',
+    );
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'comprobante.persistencia_fallida',
@@ -383,7 +429,9 @@ describe('GuiaRemisionService — Emisión', () => {
   // U-GR-12: Ambiente por defecto cuando no se especifica
   // ==========================================
   it('U-GR-12: Sin ambiente en la petición, usa el del emisor', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202606092438363100110010010000000161245294016',
@@ -464,14 +512,18 @@ describe('GuiaRemisionService — Emisión', () => {
   it('U-GR-14: SRI timeout → relanza error', async () => {
     sriSoapClient.enviarYAutorizar.mockRejectedValue(new Error('SRI timeout'));
 
-    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow('SRI timeout');
+    await expect(service.emitirGuiaRemision(createValidDto())).rejects.toThrow(
+      'SRI timeout',
+    );
   });
 
   // ==========================================
   // U-GR-15: Info adicional se persiste cuando existe
   // ==========================================
   it('U-GR-15: Info adicional se persiste cuando existe en el DTO', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202606092438363100110010010000000161245294016',
@@ -493,7 +545,9 @@ describe('GuiaRemisionService — Emisión', () => {
   // U-GR-16: Múltiples destinatarios se validan
   // ==========================================
   it('U-GR-16: Múltiples destinatarios se validan correctamente', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202606092438363100110010010000000161245294016',

@@ -196,7 +196,9 @@ describe('EmisoresService', () => {
     it('debe filtrar emisores por tenant_id', async () => {
       db.query.mockResolvedValueOnce({ rows: [mockEmisorRow] } as any);
 
-      const result = await service.findAllByTenant('tenant-uuid-1', { limit: 20 });
+      const result = await service.findAllByTenant('tenant-uuid-1', {
+        limit: 20,
+      });
 
       expect(result.data).toHaveLength(1);
       const sql = db.query.mock.calls[0][0] as string;
@@ -244,7 +246,10 @@ describe('EmisoresService', () => {
     it('debe retornar el emisor si es SUPERADMIN', async () => {
       db.query.mockResolvedValueOnce({ rows: [mockEmisorRow] } as any);
 
-      const result = await service.findOneSecured('emisor-uuid-1', superadminUser);
+      const result = await service.findOneSecured(
+        'emisor-uuid-1',
+        superadminUser,
+      );
 
       expect(result.id).toBe('emisor-uuid-1');
     });
@@ -281,7 +286,10 @@ describe('EmisoresService', () => {
     it('debe retornar el emisor si es SUPERADMIN', async () => {
       db.query.mockResolvedValueOnce({ rows: [mockEmisorRow] } as any);
 
-      const result = await service.validateEmisorAccess('emisor-uuid-1', superadminUser);
+      const result = await service.validateEmisorAccess(
+        'emisor-uuid-1',
+        superadminUser,
+      );
 
       expect(result.id).toBe('emisor-uuid-1');
     });
@@ -289,7 +297,10 @@ describe('EmisoresService', () => {
     it('debe retornar el emisor si pertenece al tenant del usuario', async () => {
       db.query.mockResolvedValueOnce({ rows: [mockEmisorRow] } as any);
 
-      const result = await service.validateEmisorAccess('emisor-uuid-1', tenantUser);
+      const result = await service.validateEmisorAccess(
+        'emisor-uuid-1',
+        tenantUser,
+      );
 
       expect(result.id).toBe('emisor-uuid-1');
     });
@@ -331,7 +342,10 @@ describe('EmisoresService', () => {
     it('debe retornar el emisor si es SUPERADMIN', async () => {
       db.query.mockResolvedValueOnce({ rows: [mockEmisorRow] } as any);
 
-      const result = await service.validateRucAccess('1712345678001', superadminUser);
+      const result = await service.validateRucAccess(
+        '1712345678001',
+        superadminUser,
+      );
 
       expect(result.ruc).toBe('1712345678001');
     });
@@ -339,7 +353,10 @@ describe('EmisoresService', () => {
     it('debe retornar el emisor si el RUC pertenece al tenant del usuario', async () => {
       db.query.mockResolvedValueOnce({ rows: [mockEmisorRow] } as any);
 
-      const result = await service.validateRucAccess('1712345678001', tenantUser);
+      const result = await service.validateRucAccess(
+        '1712345678001',
+        tenantUser,
+      );
 
       expect(result.ruc).toBe('1712345678001');
     });
@@ -677,9 +694,9 @@ describe('EmisoresService', () => {
     it('debe lanzar NotFoundException si el emisor no existe', async () => {
       db.query.mockResolvedValueOnce({ rows: [] } as any);
 
-      await expect(
-        service.deleteCertificado('non-existent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.deleteCertificado('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

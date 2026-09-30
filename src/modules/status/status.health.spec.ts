@@ -21,7 +21,9 @@ describe('Health Indicators', () => {
     let db: { query: jest.Mock };
 
     beforeEach(async () => {
-      db = { query: jest.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }) };
+      db = {
+        query: jest.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }),
+      };
 
       const module = await Test.createTestingModule({
         providers: [
@@ -41,7 +43,9 @@ describe('Health Indicators', () => {
 
     it('should throw HealthCheckError when DB query fails', async () => {
       db.query.mockRejectedValue(new Error('Connection refused'));
-      await expect(indicator.isHealthy('database')).rejects.toThrow(HealthCheckError);
+      await expect(indicator.isHealthy('database')).rejects.toThrow(
+        HealthCheckError,
+      );
     });
   });
 
@@ -83,7 +87,9 @@ describe('Health Indicators', () => {
         disconnect: jest.fn(),
       }));
 
-      await expect(indicator.isHealthy('redis')).rejects.toThrow(HealthCheckError);
+      await expect(indicator.isHealthy('redis')).rejects.toThrow(
+        HealthCheckError,
+      );
     });
   });
 
@@ -93,7 +99,10 @@ describe('Health Indicators', () => {
 
     beforeEach(async () => {
       configService = {
-        getOrThrow: jest.fn(() => 'https://celcer.sri.gob.ec/ComprobantesElectronicos/ws/recepcionComprobantesOffline?wsdl'),
+        getOrThrow: jest.fn(
+          () =>
+            'https://celcer.sri.gob.ec/ComprobantesElectronicos/ws/recepcionComprobantesOffline?wsdl',
+        ),
       };
 
       const module = await Test.createTestingModule({
@@ -123,13 +132,19 @@ describe('Health Indicators', () => {
     it('should throw HealthCheckError when SRI returns 500', async () => {
       global.fetch = jest.fn().mockResolvedValue({ status: 500 }) as any;
 
-      await expect(indicator.isHealthy('sri')).rejects.toThrow(HealthCheckError);
+      await expect(indicator.isHealthy('sri')).rejects.toThrow(
+        HealthCheckError,
+      );
     });
 
     it('should throw HealthCheckError when fetch fails', async () => {
-      global.fetch = jest.fn().mockRejectedValue(new Error('Network error')) as any;
+      global.fetch = jest
+        .fn()
+        .mockRejectedValue(new Error('Network error')) as any;
 
-      await expect(indicator.isHealthy('sri')).rejects.toThrow(HealthCheckError);
+      await expect(indicator.isHealthy('sri')).rejects.toThrow(
+        HealthCheckError,
+      );
     });
   });
 });

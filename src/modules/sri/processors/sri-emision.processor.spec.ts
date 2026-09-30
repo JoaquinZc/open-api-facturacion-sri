@@ -67,7 +67,11 @@ describe('SriEmisionProcessor', () => {
   // ==========================================
   it('U-PROC-01: Job tipo FACTURA delega a facturaService.emitirFactura', async () => {
     const mockDto = { fechaEmision: '07/02/2026' };
-    const mockResponse = { success: true, claveAcceso: 'test123', estado: 'AUTORIZADO' };
+    const mockResponse = {
+      success: true,
+      claveAcceso: 'test123',
+      estado: 'AUTORIZADO',
+    };
     facturaService.emitirFactura.mockResolvedValue(mockResponse as any);
 
     const result = await processor.process(createMockJob('FACTURA', mockDto));
@@ -80,9 +84,9 @@ describe('SriEmisionProcessor', () => {
   // U-PROC-02: Tipo no soportado lanza error
   // ==========================================
   it('U-PROC-02: Tipo no soportado lanza Error', async () => {
-    await expect(processor.process(createMockJob('TIPO_DESCONOCIDO', {}))).rejects.toThrow(
-      'Tipo de comprobante no soportado: TIPO_DESCONOCIDO',
-    );
+    await expect(
+      processor.process(createMockJob('TIPO_DESCONOCIDO', {})),
+    ).rejects.toThrow('Tipo de comprobante no soportado: TIPO_DESCONOCIDO');
   });
 
   // ==========================================
@@ -91,6 +95,8 @@ describe('SriEmisionProcessor', () => {
   it('U-PROC-03: Error de facturaService se propaga sin swallow', async () => {
     facturaService.emitirFactura.mockRejectedValue(new Error('SRI timeout'));
 
-    await expect(processor.process(createMockJob('FACTURA', {}))).rejects.toThrow('SRI timeout');
+    await expect(
+      processor.process(createMockJob('FACTURA', {})),
+    ).rejects.toThrow('SRI timeout');
   });
 });

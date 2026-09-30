@@ -606,7 +606,8 @@ export class FacturaService {
     }
 
     // Resolución NAC-DGERCGC26-00000027: RUC del proveedor del sistema
-    const infoAdicionalFinal = await this.base.injectProveedorRucInfoAdicional(infoAdicional);
+    const infoAdicionalFinal =
+      await this.base.injectProveedorRucInfoAdicional(infoAdicional);
 
     if (infoAdicionalFinal.length > 0) {
       factura.infoAdicional = infoAdicionalFinal;

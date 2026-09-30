@@ -31,18 +31,22 @@ describe('StatusController', () => {
   let configService: { get: jest.Mock };
 
   beforeEach(async () => {
-    statusService = { getStatus: jest.fn(() => ({ status: 'ok', version: '1.0.0' })) };
-    health = { check: jest.fn(async (checks) => {
-      const results: Record<string, any> = {};
-      for (const check of checks) {
-        try {
-          Object.assign(results, await check());
-        } catch (e) {
-          Object.assign(results, { error: (e as Error).message });
+    statusService = {
+      getStatus: jest.fn(() => ({ status: 'ok', version: '1.0.0' })),
+    };
+    health = {
+      check: jest.fn(async (checks) => {
+        const results: Record<string, any> = {};
+        for (const check of checks) {
+          try {
+            Object.assign(results, await check());
+          } catch (e) {
+            Object.assign(results, { error: (e as Error).message });
+          }
         }
-      }
-      return results;
-    }) };
+        return results;
+      }),
+    };
     db = { isHealthy: jest.fn(async () => ({ database: { status: 'up' } })) };
     redis = { isHealthy: jest.fn(async () => ({ redis: { status: 'up' } })) };
     sri = { isHealthy: jest.fn(async () => ({ sri_soap: { status: 'up' } })) };
@@ -89,8 +93,14 @@ describe('StatusController', () => {
 
       await controller.getStatus();
 
-      expect(memory.checkHeap).toHaveBeenCalledWith('memory_heap', 200 * 1024 * 1024);
-      expect(memory.checkRSS).toHaveBeenCalledWith('memory_rss', 400 * 1024 * 1024);
+      expect(memory.checkHeap).toHaveBeenCalledWith(
+        'memory_heap',
+        200 * 1024 * 1024,
+      );
+      expect(memory.checkRSS).toHaveBeenCalledWith(
+        'memory_rss',
+        400 * 1024 * 1024,
+      );
     });
   });
 

@@ -285,9 +285,9 @@ export class NotaDebitoService {
             comprobante_id: comprobante.id!,
             xml_firmado_path: xmlPaths.firmado?.path ?? null,
             xml_autorizado_path: xmlPaths.autorizado?.path ?? null,
-          // Solo viene con valor si la subida falló; ver XmlStorageService.
-          xml_firmado_contenido: xmlPaths.firmado?.contenido ?? null,
-          xml_autorizado_contenido: xmlPaths.autorizado?.contenido ?? null,
+            // Solo viene con valor si la subida falló; ver XmlStorageService.
+            xml_firmado_contenido: xmlPaths.firmado?.contenido ?? null,
+            xml_autorizado_contenido: xmlPaths.autorizado?.contenido ?? null,
           },
           client,
         );
@@ -409,7 +409,8 @@ export class NotaDebitoService {
     }
 
     // Resolución NAC-DGERCGC26-00000027: RUC del proveedor del sistema
-    const infoAdicionalFinal = await this.base.injectProveedorRucInfoAdicional(infoAdicional);
+    const infoAdicionalFinal =
+      await this.base.injectProveedorRucInfoAdicional(infoAdicional);
 
     if (infoAdicionalFinal.length > 0) {
       notaDebito.infoAdicional = infoAdicionalFinal;

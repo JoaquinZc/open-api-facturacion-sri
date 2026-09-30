@@ -27,7 +27,9 @@ describe('NotaCreditoService — Emisión', () => {
   let base: jest.Mocked<SriBaseService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
 
-  const mockClient = { query: jest.fn().mockResolvedValue({ rows: [{ id: 'row-uuid-1' }] }) };
+  const mockClient = {
+    query: jest.fn().mockResolvedValue({ rows: [{ id: 'row-uuid-1' }] }),
+  };
 
   const mockEmisor = {
     id: 'emisor-uuid-1',
@@ -97,19 +99,27 @@ describe('NotaCreditoService — Emisión', () => {
         {
           provide: ClaveAccesoService,
           useValue: {
-            generate: jest.fn().mockReturnValue('0702202604092438363100110010010000000161245294014'),
+            generate: jest
+              .fn()
+              .mockReturnValue(
+                '0702202604092438363100110010010000000161245294014',
+              ),
           },
         },
         {
           provide: XmlBuilderService,
           useValue: {
-            buildNotaCredito: jest.fn().mockReturnValue('<notaCredito>xml</notaCredito>'),
+            buildNotaCredito: jest
+              .fn()
+              .mockReturnValue('<notaCredito>xml</notaCredito>'),
           },
         },
         {
           provide: XmlSignerService,
           useValue: {
-            signXmlForEmisor: jest.fn().mockResolvedValue('<notaCredito>signed</notaCredito>'),
+            signXmlForEmisor: jest
+              .fn()
+              .mockResolvedValue('<notaCredito>signed</notaCredito>'),
           },
         },
         {
@@ -127,11 +137,17 @@ describe('NotaCreditoService — Emisión', () => {
             findPuntoEmision: jest.fn().mockResolvedValue(mockPuntoEmision),
             executeInTransaction: jest.fn(),
             getNextSecuencial: jest.fn().mockResolvedValue('000000016'),
-            createComprobante: jest.fn().mockResolvedValue({ id: 'comp-uuid-1' }),
+            createComprobante: jest
+              .fn()
+              .mockResolvedValue({ id: 'comp-uuid-1' }),
             createDetalles: jest.fn().mockResolvedValue([{ id: 'det-uuid-1' }]),
-            createImpuestos: jest.fn().mockResolvedValue([{ id: 'imp-uuid-1' }]),
+            createImpuestos: jest
+              .fn()
+              .mockResolvedValue([{ id: 'imp-uuid-1' }]),
             createTotales: jest.fn().mockResolvedValue([{ id: 'tot-uuid-1' }]),
-            createInfoAdicional: jest.fn().mockResolvedValue([{ id: 'info-uuid-1' }]),
+            createInfoAdicional: jest
+              .fn()
+              .mockResolvedValue([{ id: 'info-uuid-1' }]),
             saveXml: jest.fn().mockResolvedValue(undefined),
           },
         },
@@ -151,10 +167,14 @@ describe('NotaCreditoService — Emisión', () => {
           provide: SriBaseService,
           useValue: {
             validarIdentificacion: jest.fn(),
-            validarTipoIdentificacionCatalogo: jest.fn().mockResolvedValue(undefined),
+            validarTipoIdentificacionCatalogo: jest
+              .fn()
+              .mockResolvedValue(undefined),
             validarImpuestosDetalles: jest.fn().mockResolvedValue(undefined),
             validarFormasPagoCatalogo: jest.fn().mockResolvedValue(undefined),
-            validarDocumentoSustentoCatalogo: jest.fn().mockResolvedValue(undefined),
+            validarDocumentoSustentoCatalogo: jest
+              .fn()
+              .mockResolvedValue(undefined),
             getDefaultAmbiente: jest.fn().mockReturnValue(Ambiente.PRUEBAS),
             // La regla real, con el default del doble: así la prueba ve el orden
             // petición → emisor → configuración sin reimplementarlo.
@@ -196,7 +216,9 @@ describe('NotaCreditoService — Emisión', () => {
   // U-NC-01: Emisión exitosa — SRI autoriza
   // ==========================================
   it('U-NC-01: Emisión exitosa retorna NotaCreditoResponseDto con success=true', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202604092438363100110010010000000161245294014',
@@ -220,12 +242,16 @@ describe('NotaCreditoService — Emisión', () => {
   // U-NC-02: SRI devuelve comprobante (DEVUELTA)
   // ==========================================
   it('U-NC-02: SRI devuelve comprobante → estado=DEVUELTA', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: false,
       claveAcceso: '0702202604092438363100110010010000000161245294014',
       estado: 'DEVUELTA',
-      mensajes: [{ identificador: 'ERROR_1', mensaje: 'Campo inválido', tipo: 'ERROR' }],
+      mensajes: [
+        { identificador: 'ERROR_1', mensaje: 'Campo inválido', tipo: 'ERROR' },
+      ],
     });
 
     const result = await service.emitirNotaCredito(createValidDto());
@@ -239,12 +265,16 @@ describe('NotaCreditoService — Emisión', () => {
   // U-NC-03: SRI rechaza comprobante (RECHAZADO)
   // ==========================================
   it('U-NC-03: SRI rechaza → estado=RECHAZADO', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: false,
       claveAcceso: '0702202604092438363100110010010000000161245294014',
       estado: 'RECHAZADO',
-      mensajes: [{ identificador: 'ERROR_2', mensaje: 'Firma inválida', tipo: 'ERROR' }],
+      mensajes: [
+        { identificador: 'ERROR_2', mensaje: 'Firma inválida', tipo: 'ERROR' },
+      ],
     });
 
     const result = await service.emitirNotaCredito(createValidDto());
@@ -271,7 +301,9 @@ describe('NotaCreditoService — Emisión', () => {
       certificado_p12: null,
     } as any);
 
-    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
@@ -280,14 +312,18 @@ describe('NotaCreditoService — Emisión', () => {
   it('U-NC-06: Punto de emisión no encontrado → lanza BadRequestException', async () => {
     repository.findPuntoEmision.mockResolvedValue(null as any);
 
-    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
   // U-NC-07: Secuencial manual se respeta
   // ==========================================
   it('U-NC-07: Secuencial manual se respeta y no consulta BD', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202604092438363100110010010000000161245294014',
@@ -313,7 +349,9 @@ describe('NotaCreditoService — Emisión', () => {
       throw new BadRequestException('Cédula inválida');
     });
 
-    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
     expect(repository.findEmisorByRuc).not.toHaveBeenCalled();
   });
 
@@ -325,14 +363,18 @@ describe('NotaCreditoService — Emisión', () => {
       new BadRequestException('Código de documento sustento inválido'),
     );
 
-    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
   // U-NC-10: Clave de acceso generada con tipo NOTA_CREDITO (04)
   // ==========================================
   it('U-NC-10: Clave de acceso se genera con tipoComprobante=04', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202604092438363100110010010000000161245294014',
@@ -358,7 +400,9 @@ describe('NotaCreditoService — Emisión', () => {
   // U-NC-11: XML se construye y firma
   // ==========================================
   it('U-NC-11: XML se construye y se firma con certificado del emisor', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202604092438363100110010010000000161245294014',
@@ -381,8 +425,12 @@ describe('NotaCreditoService — Emisión', () => {
   // U-NC-12: Persistencia fallida emite evento persistencia_fallida
   // ==========================================
   it('U-NC-12: Falla en persistencia emite comprobante.persistencia_fallida', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
-    repository.createComprobante.mockRejectedValue(new Error('DB connection lost'));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
+    repository.createComprobante.mockRejectedValue(
+      new Error('DB connection lost'),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202604092438363100110010010000000161245294014',
@@ -392,7 +440,9 @@ describe('NotaCreditoService — Emisión', () => {
       mensajes: [],
     });
 
-    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow('DB connection lost');
+    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(
+      'DB connection lost',
+    );
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'comprobante.persistencia_fallida',
@@ -408,7 +458,9 @@ describe('NotaCreditoService — Emisión', () => {
   // U-NC-13: Ambiente por defecto cuando no se especifica
   // ==========================================
   it('U-NC-13: Sin ambiente en la petición, usa el del emisor', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202604092438363100110010010000000161245294014',
@@ -491,7 +543,9 @@ describe('NotaCreditoService — Emisión', () => {
       new BadRequestException('Código de impuesto inválido'),
     );
 
-    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(BadRequestException);
+    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   // ==========================================
@@ -500,14 +554,18 @@ describe('NotaCreditoService — Emisión', () => {
   it('U-NC-16: SRI timeout → relanza error', async () => {
     sriSoapClient.enviarYAutorizar.mockRejectedValue(new Error('SRI timeout'));
 
-    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow('SRI timeout');
+    await expect(service.emitirNotaCredito(createValidDto())).rejects.toThrow(
+      'SRI timeout',
+    );
   });
 
   // ==========================================
   // U-NC-17: Info adicional se persiste cuando existe
   // ==========================================
   it('U-NC-17: Info adicional se persiste cuando existe en el DTO', async () => {
-    repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
       claveAcceso: '0702202604092438363100110010010000000161245294014',
@@ -518,7 +576,7 @@ describe('NotaCreditoService — Emisión', () => {
     });
 
     const dto = createValidDto();
-    dto.infoAdicional = [{ nombre: 'observacion', valor: 'NC por devolución' }]
+    dto.infoAdicional = [{ nombre: 'observacion', valor: 'NC por devolución' }];
 
     await service.emitirNotaCredito(dto);
 

@@ -8,7 +8,10 @@ import { UserRole } from '../auth/dto/auth.dto';
 
 describe('RealtimeController', () => {
   let controller: RealtimeController;
-  let realtimeService: { validateToken: jest.Mock; createConnection: jest.Mock };
+  let realtimeService: {
+    validateToken: jest.Mock;
+    createConnection: jest.Mock;
+  };
 
   beforeEach(async () => {
     realtimeService = {
@@ -35,13 +38,22 @@ describe('RealtimeController', () => {
 
     it('should throw UnauthorizedException when token is invalid', () => {
       realtimeService.validateToken.mockReturnValue(null);
-      expect(() => controller.events('invalid-token')).toThrow(UnauthorizedException);
+      expect(() => controller.events('invalid-token')).toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should create connection when token is valid', () => {
-      const payload = { sub: 'user-1', email: 'test@test.com', rol: UserRole.ADMIN, tenantId: 't-1' };
+      const payload = {
+        sub: 'user-1',
+        email: 'test@test.com',
+        rol: UserRole.ADMIN,
+        tenantId: 't-1',
+      };
       realtimeService.validateToken.mockReturnValue(payload);
-      realtimeService.createConnection.mockReturnValue({ subscribe: jest.fn() });
+      realtimeService.createConnection.mockReturnValue({
+        subscribe: jest.fn(),
+      });
 
       const result = controller.events('valid-token');
       expect(result).toBeDefined();

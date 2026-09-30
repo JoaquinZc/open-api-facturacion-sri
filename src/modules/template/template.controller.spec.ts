@@ -25,8 +25,24 @@ describe('TemplateController', () => {
   beforeEach(async () => {
     templateService = {
       listTemplatesWithMetadata: jest.fn(() => [
-        { id: 'report', name: 'report.docx', extension: '.docx', size: 1024, sizeFormatted: '1 KB', isSupported: true, modifiedAt: new Date('2025-01-01') },
-        { id: 'invoice', name: 'invoice.odt', extension: '.odt', size: 2048, sizeFormatted: '2 KB', isSupported: true, modifiedAt: new Date('2025-01-02') },
+        {
+          id: 'report',
+          name: 'report.docx',
+          extension: '.docx',
+          size: 1024,
+          sizeFormatted: '1 KB',
+          isSupported: true,
+          modifiedAt: new Date('2025-01-01'),
+        },
+        {
+          id: 'invoice',
+          name: 'invoice.odt',
+          extension: '.odt',
+          size: 2048,
+          sizeFormatted: '2 KB',
+          isSupported: true,
+          modifiedAt: new Date('2025-01-02'),
+        },
       ]),
       getTemplateInfo: jest.fn((name: string) => ({
         id: name.replace(/\.[^.]+$/, ''),
@@ -75,16 +91,25 @@ describe('TemplateController', () => {
 
   describe('uploadTemplate', () => {
     it('should throw BadRequestException when no file provided', () => {
-      expect(() => controller.uploadTemplate(undefined as any)).toThrow(BadRequestException);
+      expect(() => controller.uploadTemplate(undefined as any)).toThrow(
+        BadRequestException,
+      );
     });
 
     it('should upload template and emit event', () => {
-      const file = { filename: 'report.docx', size: 1024, originalname: 'report.docx' } as Express.Multer.File;
+      const file = {
+        filename: 'report.docx',
+        size: 1024,
+        originalname: 'report.docx',
+      } as Express.Multer.File;
       const result = controller.uploadTemplate(file);
 
       expect(result.success).toBe(true);
       expect(result.data.template.name).toBe('report.docx');
-      expect(eventEmitter.emit).toHaveBeenCalledWith('plantilla.creada', expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'plantilla.creada',
+        expect.any(Object),
+      );
     });
   });
 
@@ -95,7 +120,9 @@ describe('TemplateController', () => {
 
     it('should throw NotFoundException when template does not exist', () => {
       templateService.templateExists.mockReturnValue(false);
-      expect(() => controller.deleteTemplate('notfound')).toThrow(NotFoundException);
+      expect(() => controller.deleteTemplate('notfound')).toThrow(
+        NotFoundException,
+      );
     });
 
     it('should delete template and emit event', () => {
@@ -103,7 +130,10 @@ describe('TemplateController', () => {
 
       expect(result.success).toBe(true);
       expect(templateService.deleteTemplate).toHaveBeenCalledWith('report');
-      expect(eventEmitter.emit).toHaveBeenCalledWith('plantilla.eliminada', expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'plantilla.eliminada',
+        expect.any(Object),
+      );
     });
   });
 });

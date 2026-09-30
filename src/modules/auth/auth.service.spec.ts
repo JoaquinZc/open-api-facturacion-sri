@@ -1,5 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  UnauthorizedException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -96,7 +100,9 @@ describe('AuthService', () => {
         tenantId: undefined,
       });
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, email, password_hash, rol, tenant_id, activo'),
+        expect.stringContaining(
+          'SELECT id, email, password_hash, rol, tenant_id, activo',
+        ),
         [loginDto.email],
       );
       expect(db.query).toHaveBeenCalledWith(
@@ -108,23 +114,35 @@ describe('AuthService', () => {
     it('debe lanzar UnauthorizedException si el usuario no existe', async () => {
       db.queryOne.mockResolvedValue(null);
 
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(loginDto)).rejects.toThrow('Credenciales inválidas');
+      await expect(service.login(loginDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(service.login(loginDto)).rejects.toThrow(
+        'Credenciales inválidas',
+      );
     });
 
     it('debe lanzar UnauthorizedException si el usuario está inactivo', async () => {
       db.queryOne.mockResolvedValue({ ...mockUser, activo: false });
 
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(loginDto)).rejects.toThrow('El usuario está inactivo');
+      await expect(service.login(loginDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(service.login(loginDto)).rejects.toThrow(
+        'El usuario está inactivo',
+      );
     });
 
     it('debe lanzar UnauthorizedException si la contraseña es incorrecta', async () => {
       db.queryOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.login(loginDto)).rejects.toThrow('Credenciales inválidas');
+      await expect(service.login(loginDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(service.login(loginDto)).rejects.toThrow(
+        'Credenciales inválidas',
+      );
     });
 
     it('debe llamar bcrypt.compare con la contraseña y el hash', async () => {
@@ -136,7 +154,10 @@ describe('AuthService', () => {
 
       await service.login(loginDto);
 
-      expect(bcrypt.compare).toHaveBeenCalledWith(loginDto.password, mockUser.password_hash);
+      expect(bcrypt.compare).toHaveBeenCalledWith(
+        loginDto.password,
+        mockUser.password_hash,
+      );
     });
   });
 
@@ -153,8 +174,12 @@ describe('AuthService', () => {
     it('debe refrescar tokens exitosamente con un refresh token válido', async () => {
       jwtService.verify.mockReturnValue(refreshPayload);
       db.queryOne.mockResolvedValue({ id: 'user-uuid-1', activo: true });
-      jwtService.sign.mockReturnValueOnce('new-access-token').mockReturnValueOnce('new-refresh-token');
-      jwtService.decode.mockReturnValueOnce({ exp: Math.floor(Date.now() / 1000) + 28800 });
+      jwtService.sign
+        .mockReturnValueOnce('new-access-token')
+        .mockReturnValueOnce('new-refresh-token');
+      jwtService.decode.mockReturnValueOnce({
+        exp: Math.floor(Date.now() / 1000) + 28800,
+      });
 
       const result = await service.refreshToken(refreshDto);
 
@@ -164,9 +189,14 @@ describe('AuthService', () => {
     });
 
     it('debe lanzar UnauthorizedException si el token no es de tipo refresh', async () => {
-      jwtService.verify.mockReturnValueOnce({ ...refreshPayload, type: 'access' });
+      jwtService.verify.mockReturnValueOnce({
+        ...refreshPayload,
+        type: 'access',
+      });
 
-      await expect(service.refreshToken(refreshDto)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken(refreshDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('debe lanzar UnauthorizedException si el token es inválido/expirado', async () => {
@@ -174,15 +204,21 @@ describe('AuthService', () => {
         throw new Error('jwt expired');
       });
 
-      await expect(service.refreshToken(refreshDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.refreshToken(refreshDto)).rejects.toThrow('Refresh token inválido o expirado');
+      await expect(service.refreshToken(refreshDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(service.refreshToken(refreshDto)).rejects.toThrow(
+        'Refresh token inválido o expirado',
+      );
     });
 
     it('debe lanzar UnauthorizedException si el usuario está inactivo en BD', async () => {
       jwtService.verify.mockReturnValueOnce(refreshPayload);
       db.queryOne.mockResolvedValueOnce({ id: 'user-uuid-1', activo: false });
 
-      await expect(service.refreshToken(refreshDto)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken(refreshDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
@@ -196,7 +232,8 @@ describe('AuthService', () => {
     it('debe registrar un nuevo usuario exitosamente', async () => {
       db.queryOne
         .mockResolvedValueOnce(null) // email no existe
-        .mockResolvedValueOnce({ // INSERT RETURNING
+        .mockResolvedValueOnce({
+          // INSERT RETURNING
           id: 'new-uuid',
           email: registerDto.email,
           rol: registerDto.rol,
@@ -213,26 +250,29 @@ describe('AuthService', () => {
         tenantId: null,
       });
       expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 12);
-      expect(db.queryOne).toHaveBeenNthCalledWith(2,
+      expect(db.queryOne).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('INSERT INTO usuarios'),
         [registerDto.email, 'hashed-password', registerDto.rol, null],
       );
     });
 
     it('debe asignar rol USER por defecto si no se especifica', async () => {
-      db.queryOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
-          id: 'new-uuid',
-          email: registerDto.email,
-          rol: UserRole.USER,
-          tenant_id: null,
-        });
+      db.queryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 'new-uuid',
+        email: registerDto.email,
+        rol: UserRole.USER,
+        tenant_id: null,
+      });
       (bcrypt.hash as jest.Mock).mockResolvedValueOnce('hashed-password');
 
-      await service.register({ email: registerDto.email, password: registerDto.password });
+      await service.register({
+        email: registerDto.email,
+        password: registerDto.password,
+      });
 
-      expect(db.queryOne).toHaveBeenNthCalledWith(2,
+      expect(db.queryOne).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('INSERT INTO usuarios'),
         [registerDto.email, 'hashed-password', UserRole.USER, null],
       );
@@ -241,7 +281,9 @@ describe('AuthService', () => {
     it('debe lanzar ConflictException si el email ya existe', async () => {
       db.queryOne.mockResolvedValueOnce({ id: 'existing-uuid' });
 
-      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
+      await expect(service.register(registerDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('debe lanzar NotFoundException si el tenantId no existe o está inactivo', async () => {
@@ -258,7 +300,8 @@ describe('AuthService', () => {
       db.queryOne
         .mockResolvedValueOnce(null) // email no existe
         .mockResolvedValueOnce({ id: 'tenant-uuid' }) // tenant existe y activo
-        .mockResolvedValueOnce({ // INSERT RETURNING
+        .mockResolvedValueOnce({
+          // INSERT RETURNING
           id: 'new-uuid',
           email: registerDto.email,
           rol: UserRole.ADMIN,
@@ -273,8 +316,11 @@ describe('AuthService', () => {
         tenantId: 'tenant-uuid',
       });
 
-      expect(db.queryOne).toHaveBeenNthCalledWith(2,
-        expect.stringContaining("SELECT id FROM tenants WHERE id = $1 AND estado = 'ACTIVO'"),
+      expect(db.queryOne).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining(
+          "SELECT id FROM tenants WHERE id = $1 AND estado = 'ACTIVO'",
+        ),
         ['tenant-uuid'],
       );
     });
@@ -293,7 +339,10 @@ describe('AuthService', () => {
 
       await service.changePassword(userId, currentPassword, newPassword);
 
-      expect(bcrypt.compare).toHaveBeenCalledWith(currentPassword, mockUser.password_hash);
+      expect(bcrypt.compare).toHaveBeenCalledWith(
+        currentPassword,
+        mockUser.password_hash,
+      );
       expect(bcrypt.hash).toHaveBeenCalledWith(newPassword, 12);
       expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE usuarios SET password_hash'),
@@ -304,15 +353,21 @@ describe('AuthService', () => {
     it('debe lanzar NotFoundException si el usuario no existe', async () => {
       db.queryOne.mockResolvedValueOnce(null);
 
-      await expect(service.changePassword(userId, currentPassword, newPassword)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.changePassword(userId, currentPassword, newPassword),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('debe lanzar UnauthorizedException si la contraseña actual es incorrecta', async () => {
       db.queryOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.changePassword(userId, currentPassword, newPassword)).rejects.toThrow(UnauthorizedException);
-      await expect(service.changePassword(userId, currentPassword, newPassword)).rejects.toThrow('La contraseña actual es incorrecta');
+      await expect(
+        service.changePassword(userId, currentPassword, newPassword),
+      ).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.changePassword(userId, currentPassword, newPassword),
+      ).rejects.toThrow('La contraseña actual es incorrecta');
     });
   });
 
@@ -336,14 +391,20 @@ describe('AuthService', () => {
     it('debe lanzar UnauthorizedException si el usuario no existe', async () => {
       db.queryOne.mockResolvedValue(null);
 
-      await expect(service.validatePayload(payload)).rejects.toThrow(UnauthorizedException);
-      await expect(service.validatePayload(payload)).rejects.toThrow('Token inválido o usuario inactivo');
+      await expect(service.validatePayload(payload)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(service.validatePayload(payload)).rejects.toThrow(
+        'Token inválido o usuario inactivo',
+      );
     });
 
     it('debe lanzar UnauthorizedException si el usuario está inactivo', async () => {
       db.queryOne.mockResolvedValue({ id: 'user-uuid-1', activo: false });
 
-      await expect(service.validatePayload(payload)).rejects.toThrow(UnauthorizedException);
+      await expect(service.validatePayload(payload)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('debe rechazar refresh tokens usados como access tokens', async () => {
@@ -354,7 +415,9 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
       await expect(
         service.validatePayload({ ...payload, type: 'refresh' }),
-      ).rejects.toThrow('Token de refresco no permitido para acceder a recursos');
+      ).rejects.toThrow(
+        'Token de refresco no permitido para acceder a recursos',
+      );
     });
   });
 
@@ -367,9 +430,15 @@ describe('AuthService', () => {
       const futureExp = Math.floor(Date.now() / 1000) + 28800;
       jwtService.sign.mockReturnValueOnce('access-token');
       jwtService.sign.mockReturnValueOnce('refresh-token');
-      jwtService.decode.mockReturnValueOnce({ ...mockDecodedToken, exp: futureExp });
+      jwtService.decode.mockReturnValueOnce({
+        ...mockDecodedToken,
+        exp: futureExp,
+      });
 
-      const result = await service.login({ email: 'admin@test.com', password: 'Admin123!' });
+      const result = await service.login({
+        email: 'admin@test.com',
+        password: 'Admin123!',
+      });
 
       expect(result.expiresIn).toBeGreaterThan(0);
       expect(result.expiresIn).toBeLessThanOrEqual(28800);
@@ -387,7 +456,8 @@ describe('AuthService', () => {
       await service.login({ email: 'admin@test.com', password: 'Admin123!' });
 
       expect(configService.get).toHaveBeenCalledWith('jwt.expiresIn', '8h');
-      expect(jwtService.sign).toHaveBeenNthCalledWith(1,
+      expect(jwtService.sign).toHaveBeenNthCalledWith(
+        1,
         expect.objectContaining({ type: 'access' }),
         { expiresIn: '8h' },
       );
@@ -403,7 +473,8 @@ describe('AuthService', () => {
 
       await service.login({ email: 'admin@test.com', password: 'Admin123!' });
 
-      expect(jwtService.sign).toHaveBeenNthCalledWith(2,
+      expect(jwtService.sign).toHaveBeenNthCalledWith(
+        2,
         expect.objectContaining({ type: 'refresh' }),
         { expiresIn: '7d' },
       );

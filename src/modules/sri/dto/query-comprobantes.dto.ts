@@ -86,7 +86,10 @@ export class QueryComprobantesDto {
   @IsString()
   puntoEmision?: string;
 
-  @ApiPropertyOptional({ description: 'Número de página (paginación tradicional)', default: 1 })
+  @ApiPropertyOptional({
+    description: 'Número de página (paginación tradicional)',
+    default: 1,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -158,7 +161,6 @@ export class PaginatedComprobantesDto {
   nextCursor?: string | null;
   hasMore?: boolean;
 }
-
 
 /**
  * DTO de respuesta detallada con detalles

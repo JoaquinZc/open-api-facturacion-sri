@@ -55,10 +55,20 @@ describe('SriController — Emisión Factura', () => {
           cantidad: 2,
           precioUnitario: 100,
           descuento: 0,
-          impuestos: [{ codigo: '2', codigoPorcentaje: '2', tarifa: 12, baseImponible: 200, valor: 24 }],
+          impuestos: [
+            {
+              codigo: '2',
+              codigoPorcentaje: '2',
+              tarifa: 12,
+              baseImponible: 200,
+              valor: 24,
+            },
+          ],
         },
       ],
-      pagos: [{ formaPago: FormaPago.SIN_UTILIZACION_SISTEMA_FINANCIERO, total: 224 }],
+      pagos: [
+        { formaPago: FormaPago.SIN_UTILIZACION_SISTEMA_FINANCIERO, total: 224 },
+      ],
     } as any as CreateFacturaDto;
   }
 
@@ -125,7 +135,10 @@ describe('SriController — Emisión Factura', () => {
 
     const result = await controller.emitirFactura(createValidDto(), adminUser);
 
-    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', adminUser);
+    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+      '0924383631001',
+      adminUser,
+    );
     expect(sriService.emitirFactura).toHaveBeenCalledWith(expect.any(Object));
     expect((result as any).success).toBe(true);
   });
@@ -134,9 +147,13 @@ describe('SriController — Emisión Factura', () => {
   // U-CTRL-EMI-02: emitirFactura con RUC no autorizado
   // ==========================================
   it('U-CTRL-EMI-02: emitirFactura con RUC no autorizado lanza ForbiddenException', async () => {
-    emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('RUC no pertenece al tenant'));
+    emisoresService.validateRucAccess.mockRejectedValue(
+      new ForbiddenException('RUC no pertenece al tenant'),
+    );
 
-    await expect(controller.emitirFactura(createValidDto(), adminUser)).rejects.toThrow(ForbiddenException);
+    await expect(
+      controller.emitirFactura(createValidDto(), adminUser),
+    ).rejects.toThrow(ForbiddenException);
     expect(sriService.emitirFactura).not.toHaveBeenCalled();
   });
 
@@ -160,11 +177,16 @@ describe('SriController — Emisión Factura', () => {
   // U-CTRL-EMI-04: previewFactura exitoso
   // ==========================================
   it('U-CTRL-EMI-04: previewFactura valida RUC y retorna XML', async () => {
-    sriService.generarXmlPreview.mockResolvedValue('<factura>preview</factura>');
+    sriService.generarXmlPreview.mockResolvedValue(
+      '<factura>preview</factura>',
+    );
 
     const result = await controller.previewFactura(createValidDto(), adminUser);
 
-    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', adminUser);
+    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+      '0924383631001',
+      adminUser,
+    );
     expect(sriService.generarXmlPreview).toHaveBeenCalled();
     expect(result.xml).toBe('<factura>preview</factura>');
   });
@@ -173,9 +195,13 @@ describe('SriController — Emisión Factura', () => {
   // U-CTRL-EMI-05: previewFactura con RUC no autorizado
   // ==========================================
   it('U-CTRL-EMI-05: previewFactura con RUC no autorizado lanza ForbiddenException', async () => {
-    emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('No access'));
+    emisoresService.validateRucAccess.mockRejectedValue(
+      new ForbiddenException('No access'),
+    );
 
-    await expect(controller.previewFactura(createValidDto(), adminUser)).rejects.toThrow(ForbiddenException);
+    await expect(
+      controller.previewFactura(createValidDto(), adminUser),
+    ).rejects.toThrow(ForbiddenException);
     expect(sriService.generarXmlPreview).not.toHaveBeenCalled();
   });
 
@@ -195,7 +221,10 @@ describe('SriController — Emisión Factura', () => {
       xmlFirmado: '<xml signed/>',
     });
 
-    const result = await controller.debugFacturaFirmada(createValidDto(), superadmin);
+    const result = await controller.debugFacturaFirmada(
+      createValidDto(),
+      superadmin,
+    );
 
     expect(result.claveAcceso).toHaveLength(49);
     expect(result.xmlFirmado).toBeDefined();
@@ -210,7 +239,9 @@ describe('SriController — Emisión Factura', () => {
       return undefined;
     });
 
-    await expect(controller.debugFacturaFirmada(createValidDto(), adminUser)).rejects.toThrow(ForbiddenException);
+    await expect(
+      controller.debugFacturaFirmada(createValidDto(), adminUser),
+    ).rejects.toThrow(ForbiddenException);
     expect(sriService.generarFacturaFirmadaDebug).not.toHaveBeenCalled();
   });
 
@@ -224,29 +255,44 @@ describe('SriController — Emisión Factura', () => {
       rol: UserRole.SUPERADMIN,
       tenantId: null,
     };
-    sriService.emitirFactura.mockResolvedValue({ success: true, claveAcceso: 'test', estado: 'AUTORIZADO' } as any);
+    sriService.emitirFactura.mockResolvedValue({
+      success: true,
+      claveAcceso: 'test',
+      estado: 'AUTORIZADO',
+    } as any);
 
     await controller.emitirFactura(createValidDto(), superadmin);
 
-    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', superadmin);
+    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+      '0924383631001',
+      superadmin,
+    );
   });
 
   // ==========================================
   // U-CTRL-EMI-09: previewFactura con DTO inválido (sin detalles)
   // ==========================================
   it('U-CTRL-EMI-09: previewFactura valida acceso antes de generar XML', async () => {
-    emisoresService.validateRucAccess.mockRejectedValue(new ForbiddenException('Access denied'));
+    emisoresService.validateRucAccess.mockRejectedValue(
+      new ForbiddenException('Access denied'),
+    );
 
-    await expect(controller.previewFactura(createValidDto(), adminUser)).rejects.toThrow(ForbiddenException);
+    await expect(
+      controller.previewFactura(createValidDto(), adminUser),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   // ==========================================
   // U-CTRL-EMI-10: emitirFactura propaga error de FacturaService
   // ==========================================
   it('U-CTRL-EMI-10: emitirFactura propaga BadRequestException del servicio', async () => {
-    sriService.emitirFactura.mockRejectedValue(new BadRequestException('Certificado no encontrado'));
+    sriService.emitirFactura.mockRejectedValue(
+      new BadRequestException('Certificado no encontrado'),
+    );
 
-    await expect(controller.emitirFactura(createValidDto(), adminUser)).rejects.toThrow(BadRequestException);
+    await expect(
+      controller.emitirFactura(createValidDto(), adminUser),
+    ).rejects.toThrow(BadRequestException);
   });
 
   // ==========================================
@@ -262,7 +308,10 @@ describe('SriController — Emisión Factura', () => {
     const dto = { ...createValidDto(), infoNotaCredito: {} } as any;
     const result = await controller.emitirNotaCredito(dto, adminUser);
 
-    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', adminUser);
+    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+      '0924383631001',
+      adminUser,
+    );
     expect(sriService.emitirNotaCredito).toHaveBeenCalled();
     expect((result as any).success).toBe(true);
   });
@@ -280,7 +329,10 @@ describe('SriController — Emisión Factura', () => {
     const dto = { ...createValidDto(), infoNotaDebito: {}, motivos: [] } as any;
     const result = await controller.emitirNotaDebito(dto, adminUser);
 
-    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', adminUser);
+    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+      '0924383631001',
+      adminUser,
+    );
     expect(sriService.emitirNotaDebito).toHaveBeenCalled();
     expect((result as any).success).toBe(true);
   });
@@ -295,10 +347,18 @@ describe('SriController — Emisión Factura', () => {
       estado: 'AUTORIZADO',
     } as any);
 
-    const dto = { ...createValidDto(), sujetoRetenido: {}, impuestosDocSustento: [], impuestosRetenidos: [] } as any;
+    const dto = {
+      ...createValidDto(),
+      sujetoRetenido: {},
+      impuestosDocSustento: [],
+      impuestosRetenidos: [],
+    } as any;
     const result = await controller.emitirRetencion(dto, adminUser);
 
-    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', adminUser);
+    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+      '0924383631001',
+      adminUser,
+    );
     expect(sriService.emitirRetencion).toHaveBeenCalled();
     expect((result as any).success).toBe(true);
   });
@@ -313,10 +373,18 @@ describe('SriController — Emisión Factura', () => {
       estado: 'AUTORIZADO',
     } as any);
 
-    const dto = { ...createValidDto(), infoGuiaRemision: {}, destinatarios: [], detalles: [] } as any;
+    const dto = {
+      ...createValidDto(),
+      infoGuiaRemision: {},
+      destinatarios: [],
+      detalles: [],
+    } as any;
     const result = await controller.emitirGuiaRemision(dto, adminUser);
 
-    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith('0924383631001', adminUser);
+    expect(emisoresService.validateRucAccess).toHaveBeenCalledWith(
+      '0924383631001',
+      adminUser,
+    );
     expect(sriService.emitirGuiaRemision).toHaveBeenCalled();
     expect((result as any).success).toBe(true);
   });
@@ -331,9 +399,14 @@ describe('SriController — Emisión Factura', () => {
       estado: 'AUTORIZADO',
     } as any);
 
-    const result = await controller.consultarAutorizacion('0702202601092438363100110010010000000161245294013', adminUser);
+    const result = await controller.consultarAutorizacion(
+      '0702202601092438363100110010010000000161245294013',
+      adminUser,
+    );
 
-    expect(sriService.consultarAutorizacion).toHaveBeenCalledWith('0702202601092438363100110010010000000161245294013');
+    expect(sriService.consultarAutorizacion).toHaveBeenCalledWith(
+      '0702202601092438363100110010010000000161245294013',
+    );
     expect((result as any).success).toBe(true);
   });
 
@@ -352,12 +425,16 @@ describe('SriController — Emisión Factura', () => {
   // U-CTRL-EMI-17: validarXml con archivo delega al servicio
   // ==========================================
   it('U-CTRL-EMI-17: validarXml con archivo XML delega al servicio', async () => {
-    const mockFile = { buffer: Buffer.from('<?xml version="1.0"?><factura/>') } as Express.Multer.File;
+    const mockFile = {
+      buffer: Buffer.from('<?xml version="1.0"?><factura/>'),
+    } as Express.Multer.File;
     sriService.validarXml.mockResolvedValue({ valido: true, errores: [] });
 
     const result = await controller.validarXml(mockFile);
 
-    expect(sriService.validarXml).toHaveBeenCalledWith('<?xml version="1.0"?><factura/>');
+    expect(sriService.validarXml).toHaveBeenCalledWith(
+      '<?xml version="1.0"?><factura/>',
+    );
     expect(result.valido).toBe(true);
   });
 
@@ -365,7 +442,9 @@ describe('SriController — Emisión Factura', () => {
   // U-CTRL-EMI-18: debugFacturaFirmada con ADMIN (no SUPERADMIN) lanza ForbiddenException
   // ==========================================
   it('U-CTRL-EMI-18: debugFacturaFirmada con ADMIN lanza ForbiddenException', async () => {
-    await expect(controller.debugFacturaFirmada(createValidDto(), adminUser)).rejects.toThrow(ForbiddenException);
+    await expect(
+      controller.debugFacturaFirmada(createValidDto(), adminUser),
+    ).rejects.toThrow(ForbiddenException);
     expect(sriService.generarFacturaFirmadaDebug).not.toHaveBeenCalled();
   });
 });

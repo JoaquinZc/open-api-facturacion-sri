@@ -53,15 +53,23 @@ export default () => ({
     // Rate limiting parametrizable por tipo de operación
     rateLimiting: {
       recepcion: {
-        retries:   parseInt(optionalEnv('SRI_RECEPCION_RETRIES', '3'), 10),
-        delayMs:   parseInt(optionalEnv('SRI_RECEPCION_DELAY_MS', '1000'), 10),
-        timeoutMs: parseInt(optionalEnv('SRI_RECEPCION_TIMEOUT_MS', '30000'), 10),
+        retries: parseInt(optionalEnv('SRI_RECEPCION_RETRIES', '3'), 10),
+        delayMs: parseInt(optionalEnv('SRI_RECEPCION_DELAY_MS', '1000'), 10),
+        timeoutMs: parseInt(
+          optionalEnv('SRI_RECEPCION_TIMEOUT_MS', '30000'),
+          10,
+        ),
       },
       autorizacion: {
-        retries:           parseInt(optionalEnv('SRI_AUTORIZACION_RETRIES', '5'), 10),
-        delayMs:           parseInt(optionalEnv('SRI_AUTORIZACION_DELAY_MS', '2000'), 10),
-        backoffMultiplier: parseFloat(optionalEnv('SRI_AUTORIZACION_BACKOFF_MULTIPLIER', '1.5')),
-        timeoutMs:         parseInt(optionalEnv('SRI_AUTORIZACION_TIMEOUT_MS', '60000'), 10),
+        retries: parseInt(optionalEnv('SRI_AUTORIZACION_RETRIES', '5'), 10),
+        delayMs: parseInt(optionalEnv('SRI_AUTORIZACION_DELAY_MS', '2000'), 10),
+        backoffMultiplier: parseFloat(
+          optionalEnv('SRI_AUTORIZACION_BACKOFF_MULTIPLIER', '1.5'),
+        ),
+        timeoutMs: parseInt(
+          optionalEnv('SRI_AUTORIZACION_TIMEOUT_MS', '60000'),
+          10,
+        ),
       },
     },
   },
@@ -162,14 +170,26 @@ export default () => ({
     sriEmision: {
       attempts: parseInt(optionalEnv('QUEUE_SRI_ATTEMPTS', '3'), 10),
       backoffDelayMs: parseInt(optionalEnv('QUEUE_SRI_BACKOFF_MS', '2000'), 10),
-      removeOnComplete: parseInt(optionalEnv('QUEUE_SRI_KEEP_COMPLETED', '1000'), 10),
+      removeOnComplete: parseInt(
+        optionalEnv('QUEUE_SRI_KEEP_COMPLETED', '1000'),
+        10,
+      ),
       removeOnFail: parseInt(optionalEnv('QUEUE_SRI_KEEP_FAILED', '5000'), 10),
     },
     webhookDispatch: {
       attempts: parseInt(optionalEnv('QUEUE_WEBHOOK_ATTEMPTS', '5'), 10),
-      backoffDelayMs: parseInt(optionalEnv('QUEUE_WEBHOOK_BACKOFF_MS', '3000'), 10),
-      removeOnComplete: parseInt(optionalEnv('QUEUE_WEBHOOK_KEEP_COMPLETED', '500'), 10),
-      removeOnFail: parseInt(optionalEnv('QUEUE_WEBHOOK_KEEP_FAILED', '2000'), 10),
+      backoffDelayMs: parseInt(
+        optionalEnv('QUEUE_WEBHOOK_BACKOFF_MS', '3000'),
+        10,
+      ),
+      removeOnComplete: parseInt(
+        optionalEnv('QUEUE_WEBHOOK_KEEP_COMPLETED', '500'),
+        10,
+      ),
+      removeOnFail: parseInt(
+        optionalEnv('QUEUE_WEBHOOK_KEEP_FAILED', '2000'),
+        10,
+      ),
     },
   },
 });

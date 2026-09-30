@@ -67,7 +67,11 @@ describe('TemplateService', () => {
   describe('listTemplatesWithMetadata', () => {
     it('should return templates with metadata', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (fs.readdirSync as jest.Mock).mockReturnValue(['report.docx', 'invoice.odt', 'readme.txt']);
+      (fs.readdirSync as jest.Mock).mockReturnValue([
+        'report.docx',
+        'invoice.odt',
+        'readme.txt',
+      ]);
       (fs.statSync as jest.Mock).mockReturnValue({
         size: 1024,
         birthtime: new Date('2026-01-01'),
@@ -92,7 +96,10 @@ describe('TemplateService', () => {
 
   describe('templateExists', () => {
     it('should return true when template exists', () => {
-      (fs.readdirSync as jest.Mock).mockReturnValue(['report.docx', 'other.odt']);
+      (fs.readdirSync as jest.Mock).mockReturnValue([
+        'report.docx',
+        'other.odt',
+      ]);
       expect(service.templateExists('report')).toBe(true);
     });
 
@@ -182,7 +189,9 @@ describe('TemplateService', () => {
 
     it('should throw NotFoundException when file does not exist', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(false);
-      expect(() => service.getTemplateInfo('missing.docx')).toThrow(NotFoundException);
+      expect(() => service.getTemplateInfo('missing.docx')).toThrow(
+        NotFoundException,
+      );
     });
   });
 });

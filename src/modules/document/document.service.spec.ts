@@ -72,7 +72,9 @@ describe('DocumentService', () => {
     it('should return MIME types mapping', () => {
       const mimes = service.getMimeTypes();
       expect(mimes['pdf']).toBe('application/pdf');
-      expect(mimes['docx']).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      expect(mimes['docx']).toBe(
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
     });
   });
 
@@ -90,8 +92,12 @@ describe('DocumentService', () => {
   describe('generateDocument', () => {
     it('should generate document via Carbone API', async () => {
       (axios.post as jest.Mock)
-        .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
-        .mockResolvedValueOnce({ data: { success: true, data: { renderId: 'rnd-456' } } });
+        .mockResolvedValueOnce({
+          data: { success: true, data: { templateId: 'tpl-123' } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { renderId: 'rnd-456' } },
+        });
       (axios.get as jest.Mock)
         .mockResolvedValueOnce({ data: { success: true } })
         .mockResolvedValueOnce({ data: Buffer.from('fake-doc') });
@@ -108,7 +114,11 @@ describe('DocumentService', () => {
 
     it('should throw error for unsupported format', async () => {
       await expect(
-        service.generateDocument({ title: 'Test' }, '/fake/templates/report.docx', 'xyz'),
+        service.generateDocument(
+          { title: 'Test' },
+          '/fake/templates/report.docx',
+          'xyz',
+        ),
       ).rejects.toThrow();
     });
 
@@ -118,13 +128,21 @@ describe('DocumentService', () => {
       try {
         (axios.post as jest.Mock)
           .mockRejectedValueOnce({ code: 'ECONNREFUSED' })
-          .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
-          .mockResolvedValueOnce({ data: { success: true, data: { renderId: 'rnd-456' } } });
+          .mockResolvedValueOnce({
+            data: { success: true, data: { templateId: 'tpl-123' } },
+          })
+          .mockResolvedValueOnce({
+            data: { success: true, data: { renderId: 'rnd-456' } },
+          });
         (axios.get as jest.Mock)
           .mockResolvedValueOnce({ data: { success: true } })
           .mockResolvedValueOnce({ data: Buffer.from('fake-doc') });
 
-        const doc = service.generateDocument({ title: 'Test' }, '/fake/templates/report.docx', 'pdf');
+        const doc = service.generateDocument(
+          { title: 'Test' },
+          '/fake/templates/report.docx',
+          'pdf',
+        );
         await jest.advanceTimersByTimeAsync(1000);
 
         await expect(doc).resolves.toBeDefined();
@@ -136,17 +154,27 @@ describe('DocumentService', () => {
     });
 
     it('should throw error when template upload fails', async () => {
-      (axios.post as jest.Mock).mockResolvedValueOnce({ data: { success: false } });
+      (axios.post as jest.Mock).mockResolvedValueOnce({
+        data: { success: false },
+      });
 
       await expect(
-        service.generateDocument({ title: 'Test' }, '/fake/templates/report.docx', 'pdf'),
+        service.generateDocument(
+          { title: 'Test' },
+          '/fake/templates/report.docx',
+          'pdf',
+        ),
       ).rejects.toThrow();
     });
 
     it('should retry on status check failure', async () => {
       (axios.post as jest.Mock)
-        .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
-        .mockResolvedValueOnce({ data: { success: true, data: { renderId: 'rnd-456' } } });
+        .mockResolvedValueOnce({
+          data: { success: true, data: { templateId: 'tpl-123' } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { renderId: 'rnd-456' } },
+        });
       (axios.get as jest.Mock)
         .mockResolvedValueOnce({ data: { success: false } })
         .mockResolvedValueOnce({ data: { success: true } })
@@ -162,12 +190,20 @@ describe('DocumentService', () => {
 
     it('should throw timeout when status never succeeds', async () => {
       (axios.post as jest.Mock)
-        .mockResolvedValueOnce({ data: { success: true, data: { templateId: 'tpl-123' } } })
-        .mockResolvedValueOnce({ data: { success: true, data: { renderId: 'rnd-456' } } });
+        .mockResolvedValueOnce({
+          data: { success: true, data: { templateId: 'tpl-123' } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { renderId: 'rnd-456' } },
+        });
       (axios.get as jest.Mock).mockResolvedValue({ data: { success: false } });
 
       await expect(
-        service.generateDocument({ title: 'Test' }, '/fake/templates/report.docx', 'pdf'),
+        service.generateDocument(
+          { title: 'Test' },
+          '/fake/templates/report.docx',
+          'pdf',
+        ),
       ).rejects.toThrow('Tiempo de espera agotado');
     });
   });

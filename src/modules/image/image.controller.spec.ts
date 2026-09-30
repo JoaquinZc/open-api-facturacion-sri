@@ -16,11 +16,17 @@ jest.mock('../../common/utils/file.utils', () => ({
 
 describe('ImageController', () => {
   let controller: ImageController;
-  let imageService: { buildImageUrl: jest.Mock; listImages: jest.Mock; deleteImage: jest.Mock };
+  let imageService: {
+    buildImageUrl: jest.Mock;
+    listImages: jest.Mock;
+    deleteImage: jest.Mock;
+  };
 
   beforeEach(async () => {
     imageService = {
-      buildImageUrl: jest.fn((name: string) => `http://test.com/images/${name}`),
+      buildImageUrl: jest.fn(
+        (name: string) => `http://test.com/images/${name}`,
+      ),
       listImages: jest.fn(() => ({
         images: [{ name: 'img1.png', size: 1024, createdAt: new Date() }],
         total: 1,
@@ -39,11 +45,17 @@ describe('ImageController', () => {
 
   describe('uploadImage', () => {
     it('should throw BadRequestException when no file provided', () => {
-      expect(() => controller.uploadImage(undefined as any)).toThrow(BadRequestException);
+      expect(() => controller.uploadImage(undefined as any)).toThrow(
+        BadRequestException,
+      );
     });
 
     it('should return upload result when file is provided', () => {
-      const file = { filename: 'test.png', size: 1024, mimetype: 'image/png' } as Express.Multer.File;
+      const file = {
+        filename: 'test.png',
+        size: 1024,
+        mimetype: 'image/png',
+      } as Express.Multer.File;
       const result = controller.uploadImage(file);
 
       expect(result.success).toBe(true);
@@ -66,7 +78,10 @@ describe('ImageController', () => {
     it('should list images with pagination options', () => {
       controller.listImages('2', '10');
 
-      expect(imageService.listImages).toHaveBeenCalledWith({ page: 2, limit: 10 });
+      expect(imageService.listImages).toHaveBeenCalledWith({
+        page: 2,
+        limit: 10,
+      });
     });
   });
 
