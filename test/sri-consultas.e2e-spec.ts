@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { SriController } from '../src/modules/sri/sri.controller';
+import { RideService } from '../src/modules/sri/services/ride.service';
 import { SriService } from '../src/modules/sri/sri.service';
 import { EmisoresService } from '../src/modules/emisores/emisores.service';
 import { ConfigService } from '@nestjs/config';
@@ -136,6 +137,7 @@ describe('SRI Consultas — Integration Tests (supertest)', () => {
             ]),
           },
         },
+        { provide: RideService, useValue: { generarRide: jest.fn() } },
         {
           provide: ConfigService,
           useValue: {

@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SriService } from './sri.service';
+import { DatabaseService } from '../../database';
 import { SriSoapClient } from './services';
 import { SriRepositoryService } from './services/sri-repository.service';
 import { XmlStorageService } from './services/xml-storage.service';
@@ -71,6 +72,12 @@ describe('SriService — Consultas', () => {
               return defaultValue;
             }),
           },
+        },
+        // `sincronizar` escribe en la base; las pruebas que lo ejercen lo
+        // configuran, el resto no lo toca.
+        {
+          provide: DatabaseService,
+          useValue: { query: jest.fn(), queryOne: jest.fn() },
         },
         {
           provide: 'BullQueue_sri-emision',
@@ -669,9 +676,12 @@ describe('SriService — Consultas', () => {
     it('U-XML-02: XML no disponible retorna null', async () => {
       repository.findComprobanteByClaveAcceso.mockResolvedValue({ id: 'comp-1', estado: 'PENDIENTE' } as any);
       repository.findXmlAutorizado.mockResolvedValue({ path: null, contenido: null });
+      // Lo que hace el `readXml` real sin ruta ni respaldo: no hay nada que leer.
+      xmlStorage.readXml.mockResolvedValue(null);
 
       const result = await service.obtenerXmlAutorizado('0702202601092438363100110010010000000161245294013');
 
+      expect(xmlStorage.readXml).toHaveBeenCalledWith(null, null);
       expect(result).toBeNull();
     });
 

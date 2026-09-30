@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe, ExecutionContext, ForbiddenException 
 import { APP_GUARD } from '@nestjs/core';
 import request from 'supertest';
 import { SriController } from '../src/modules/sri/sri.controller';
+import { RideService } from '../src/modules/sri/services/ride.service';
 import { SriService } from '../src/modules/sri/sri.service';
 import { EmisoresService } from '../src/modules/emisores/emisores.service';
 import { ConfigService } from '@nestjs/config';
@@ -25,6 +26,15 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     email: 'user@test.com',
     rol: UserRole.ADMIN,
     tenantId: 'tenant-abc',
+  };
+
+  // El endpoint de depuración firma con el certificado de cualquier emisor:
+  // solo SUPERADMIN puede usarlo (ver U-CTRL-EMI-18).
+  const superadminUser: JwtPayload = {
+    sub: 'user-root',
+    email: 'root@test.com',
+    rol: UserRole.SUPERADMIN,
+    tenantId: null,
   };
 
   function createValidFacturaBody() {
@@ -76,6 +86,7 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
             findByTenantId: jest.fn(),
           },
         },
+        { provide: RideService, useValue: { generarRide: jest.fn() } },
         {
           provide: ConfigService,
           useValue: {
@@ -250,7 +261,7 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
     app = appInstance;
     sriService = moduleFixture.get(SriService);
 
-    sriService.generarXmlPreview.mockReturnValue('<factura>preview</factura>');
+    sriService.generarXmlPreview.mockResolvedValue('<factura>preview</factura>');
 
     const res = await request(app.getHttpServer())
       .post('/sri/preview/factura')
@@ -277,7 +288,7 @@ describe('SRI Emitir Factura — Integration Tests (supertest)', () => {
   // I-EMI-10: POST /sri/debug/factura-firmada — exitoso en test
   // ==========================================
   it('I-EMI-10: POST /sri/debug/factura-firmada retorna 200 con XML firmado', async () => {
-    const { appInstance, moduleFixture } = await createAppWithUser(adminUser);
+    const { appInstance, moduleFixture } = await createAppWithUser(superadminUser);
     app = appInstance;
     sriService = moduleFixture.get(SriService);
 

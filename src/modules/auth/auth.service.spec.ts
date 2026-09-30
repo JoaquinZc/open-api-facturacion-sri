@@ -79,7 +79,7 @@ describe('AuthService', () => {
     it('debe retornar tokens cuando las credenciales son válidas', async () => {
       db.queryOne.mockResolvedValueOnce(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-      db.query.mockResolvedValueOnce(undefined);
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never);
       jwtService.sign.mockReturnValueOnce('access-token');
       jwtService.sign.mockReturnValueOnce('refresh-token');
       jwtService.decode.mockReturnValueOnce(mockDecodedToken);
@@ -130,7 +130,7 @@ describe('AuthService', () => {
     it('debe llamar bcrypt.compare con la contraseña y el hash', async () => {
       db.queryOne.mockResolvedValueOnce(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-      db.query.mockResolvedValueOnce(undefined);
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never);
       jwtService.sign.mockReturnValue('token');
       jwtService.decode.mockReturnValueOnce(mockDecodedToken);
 
@@ -289,7 +289,7 @@ describe('AuthService', () => {
       db.queryOne.mockResolvedValueOnce(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
       (bcrypt.hash as jest.Mock).mockResolvedValueOnce('new-hash');
-      db.query.mockResolvedValueOnce(undefined);
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never);
 
       await service.changePassword(userId, currentPassword, newPassword);
 
@@ -362,7 +362,7 @@ describe('AuthService', () => {
     it('debe incluir expiresIn calculado desde el token decodificado', async () => {
       db.queryOne.mockResolvedValueOnce(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-      db.query.mockResolvedValueOnce(undefined);
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never);
 
       const futureExp = Math.floor(Date.now() / 1000) + 28800;
       jwtService.sign.mockReturnValueOnce('access-token');
@@ -379,7 +379,7 @@ describe('AuthService', () => {
     it('debe usar configService para expiresIn del access token', async () => {
       db.queryOne.mockResolvedValueOnce(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-      db.query.mockResolvedValueOnce(undefined);
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never);
       jwtService.sign.mockReturnValueOnce('access-token');
       jwtService.sign.mockReturnValueOnce('refresh-token');
       jwtService.decode.mockReturnValueOnce(mockDecodedToken);
@@ -396,7 +396,7 @@ describe('AuthService', () => {
     it('debe generar refresh token con expiración de 7d', async () => {
       db.queryOne.mockResolvedValueOnce(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-      db.query.mockResolvedValueOnce(undefined);
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 } as never);
       jwtService.sign.mockReturnValueOnce('access-token');
       jwtService.sign.mockReturnValueOnce('refresh-token');
       jwtService.decode.mockReturnValueOnce(mockDecodedToken);

@@ -40,6 +40,7 @@ describe('AuthController', () => {
             refreshToken: jest.fn(),
             register: jest.fn(),
             changePassword: jest.fn(),
+            getProfile: jest.fn(),
           },
         },
       ],
@@ -130,31 +131,45 @@ describe('AuthController', () => {
     });
   });
 
+  /*
+   * `/auth/me` ya no devuelve el contenido del token: pregunta a la base por
+   * el usuario (`AuthService.getProfile`), para que un rol o un tenant
+   * cambiados después del login se vean sin esperar a que caduque el JWT.
+   */
   describe('GET /auth/me', () => {
-    it('debe retornar los datos del usuario autenticado', () => {
-      const result = controller.getProfile(mockUser);
+    const perfil = {
+      id: mockUser.sub,
+      email: mockUser.email,
+      rol: mockUser.rol,
+      tenantId: mockUser.tenantId,
+      tenantNombre: 'Tenant Test',
+      activo: true,
+    };
 
-      expect(result).toEqual({
-        id: mockUser.sub,
-        email: mockUser.email,
-        rol: mockUser.rol,
-        tenantId: mockUser.tenantId,
-      });
+    it('debe retornar los datos del usuario autenticado', async () => {
+      authService.getProfile.mockResolvedValue(perfil);
+
+      const result = await controller.getProfile(mockUser);
+
+      expect(result).toEqual(perfil);
     });
 
-    it('debe retornar el id desde sub del payload', () => {
+    it('debe buscar el usuario por el sub del payload', async () => {
       const userWithTenant: JwtPayload = {
         ...mockUser,
         sub: 'tenant-user-uuid',
         tenantId: 'tenant-abc',
         rol: UserRole.ADMIN,
       };
+      authService.getProfile.mockResolvedValue({
+        ...perfil,
+        id: 'tenant-user-uuid',
+      });
 
-      const result = controller.getProfile(userWithTenant);
+      const result = await controller.getProfile(userWithTenant);
 
+      expect(authService.getProfile).toHaveBeenCalledWith('tenant-user-uuid');
       expect(result.id).toBe('tenant-user-uuid');
-      expect(result.tenantId).toBe('tenant-abc');
-      expect(result.rol).toBe(UserRole.ADMIN);
     });
   });
 

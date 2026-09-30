@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SriService } from './sri.service';
+import { DatabaseService } from '../../database';
 import { SriSoapClient, FacturaService, NotaCreditoService, NotaDebitoService, RetencionService, GuiaRemisionService, XmlBuilderService } from './services';
 import { SriRepositoryService } from './services/sri-repository.service';
 import { XmlStorageService } from './services/xml-storage.service';
@@ -86,6 +87,12 @@ describe('SriService — Emisión Factura', () => {
           },
         },
         { provide: XmlBuilderService, useValue: { parseXml: jest.fn() } },
+        // `sincronizar` escribe en la base; las pruebas que lo ejercen lo
+        // configuran, el resto no lo toca.
+        {
+          provide: DatabaseService,
+          useValue: { query: jest.fn(), queryOne: jest.fn() },
+        },
         { provide: 'BullQueue_sri-emision', useValue: emisionQueue },
       ],
     }).compile();
