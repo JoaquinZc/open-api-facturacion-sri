@@ -7,6 +7,7 @@ import {
   Matches,
   IsNotEmpty,
   IsEnum,
+  IsIn,
   IsInt,
   Min,
   Max,
@@ -14,6 +15,10 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
+import {
+  CATEGORIAS_RIMPE,
+  type CategoriaRimpe,
+} from '../../sri/constants/rimpe';
 
 // Enums estrictos para ambiente y estado
 export enum EmisorAmbiente {
@@ -108,6 +113,16 @@ export class CreateEmisorDto {
   @IsOptional()
   @IsBoolean()
   contribuyenteRimpe?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Categoría dentro del RIMPE; decide la leyenda del RIDE. Sin ella, un RIMPE es emprendedor.',
+    enum: CATEGORIAS_RIMPE,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsIn(CATEGORIAS_RIMPE)
+  categoriaRimpe?: CategoriaRimpe | null;
 
   @ApiPropertyOptional({
     description: 'Ambiente SRI',
@@ -213,6 +228,16 @@ export class UpdateEmisorDto {
   contribuyenteRimpe?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      'Categoría dentro del RIMPE; decide la leyenda del RIDE. Sin ella, un RIMPE es emprendedor.',
+    enum: CATEGORIAS_RIMPE,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsIn(CATEGORIAS_RIMPE)
+  categoriaRimpe?: CategoriaRimpe | null;
+
+  @ApiPropertyOptional({
     description: 'Ambiente SRI',
     enum: EmisorAmbiente,
   })
@@ -298,6 +323,9 @@ export class EmisorResponseDto {
 
   @ApiProperty()
   contribuyenteRimpe: boolean;
+
+  @ApiPropertyOptional({ enum: CATEGORIAS_RIMPE, nullable: true })
+  categoriaRimpe?: CategoriaRimpe | null;
 
   @ApiProperty()
   ambiente: string;

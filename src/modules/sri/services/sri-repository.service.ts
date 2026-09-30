@@ -645,6 +645,7 @@ export class SriRepositoryService {
         e.contribuyente_especial as contribuyente_especial,
         e.agente_retencion as agente_retencion,
         e.contribuyente_rimpe as contribuyente_rimpe,
+        e.categoria_rimpe as categoria_rimpe,
         -- Datos de marca del RIDE. No son fiscales: solo se imprimen.
         e.eslogan as emisor_eslogan,
         e.ciudad as emisor_ciudad,
