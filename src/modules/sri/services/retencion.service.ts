@@ -61,11 +61,11 @@ export class RetencionService {
         await this.base.validarDocumentoSustentoCatalogo(imp.codDocSustento);
       }
 
-      const ambiente = dto.ambiente || this.base.getDefaultAmbiente();
       const tipoEmision = dto.tipoEmision || TipoEmision.NORMAL;
 
       // Get emisor info from database
       const emisor = await this.repository.findEmisorByRuc(dto.emisor.ruc);
+      const ambiente = this.base.resolverAmbiente(dto.ambiente, emisor);
       const puntoEmisionInfo = emisor
         ? await this.repository.findPuntoEmision(
             emisor.id,

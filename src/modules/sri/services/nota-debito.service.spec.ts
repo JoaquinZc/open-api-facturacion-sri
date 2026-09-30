@@ -148,6 +148,22 @@ describe('NotaDebitoService — Emisión', () => {
             validarTipoIdentificacionCatalogo: jest.fn().mockResolvedValue(undefined),
             validarDocumentoSustentoCatalogo: jest.fn().mockResolvedValue(undefined),
             getDefaultAmbiente: jest.fn().mockReturnValue(Ambiente.PRUEBAS),
+            // La regla real, con el default del doble: así la prueba ve el orden
+            // petición → emisor → configuración sin reimplementarlo.
+            resolverAmbiente: jest.fn(function (
+              this: SriBaseService,
+              pedido: string | undefined,
+              emisor: { ambiente?: string | number | null } | null,
+            ) {
+              return SriBaseService.prototype.resolverAmbiente.call(
+                this,
+                pedido,
+                emisor,
+              );
+            }),
+            injectProveedorRucInfoAdicional: jest.fn((info: unknown[]) =>
+              Promise.resolve(info),
+            ),
           },
         },
         {
@@ -399,7 +415,7 @@ describe('NotaDebitoService — Emisión', () => {
   // ==========================================
   // U-ND-14: Ambiente por defecto cuando no se especifica
   // ==========================================
-  it('U-ND-14: Usa ambiente por defecto (PRUEBAS) cuando dto no lo especifica', async () => {
+  it('U-ND-14: Sin ambiente en la petición, usa el del emisor', async () => {
     repository.executeInTransaction.mockImplementation(async (fn: any) => fn(mockClient));
     sriSoapClient.enviarYAutorizar.mockResolvedValue({
       success: true,
@@ -410,12 +426,41 @@ describe('NotaDebitoService — Emisión', () => {
       mensajes: [],
     });
 
+    // El emisor está en producción; la petición no dice nada.
+    repository.findEmisorByRuc.mockResolvedValue({
+      ...mockEmisor,
+      ambiente: '2',
+    } as any);
     const dto = createValidDto();
     delete (dto as any).ambiente;
 
     await service.emitirNotaDebito(dto);
 
-    expect(base.getDefaultAmbiente).toHaveBeenCalled();
+    expect(claveAccesoService.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ ambiente: Ambiente.PRODUCCION }),
+    );
+  });
+
+  it('U-ND-14b: El ambiente de la petición manda sobre el del emisor', async () => {
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient as any),
+    );
+    sriSoapClient.enviarYAutorizar.mockResolvedValue({
+      success: true,
+      claveAcceso: '0702202601092438363100110010010000000161245294013',
+      estado: 'AUTORIZADO',
+      mensajes: [],
+    } as any);
+    // Es el caso de la nota de crédito sobre una factura de pruebas cuando
+    // el emisor ya pasó a producción.
+    repository.findEmisorByRuc.mockResolvedValue({
+      ...mockEmisor,
+      ambiente: '2',
+    } as any);
+    const dto = { ...createValidDto(), ambiente: Ambiente.PRUEBAS } as any;
+
+    await service.emitirNotaDebito(dto).catch(() => undefined);
+
     expect(claveAccesoService.generate).toHaveBeenCalledWith(
       expect.objectContaining({ ambiente: Ambiente.PRUEBAS }),
     );
