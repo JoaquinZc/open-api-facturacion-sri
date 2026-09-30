@@ -191,7 +191,8 @@ async function seedAdmin(client: Client): Promise<void> {
  *
  * **Reglas para añadir aquí:**
  *   - Solo operaciones que se puedan repetir sin efecto (`IF NOT EXISTS`).
- *   - Nunca `DROP` ni `ALTER TYPE`: eso necesita una ventana y un respaldo.
+ *   - Nunca `DROP` ni `ALTER TYPE` (salvo **ensanchar** un `varchar`, que solo
+ *     toca el catálogo): eso necesita una ventana y un respaldo.
  *   - Nunca una columna `NOT NULL` sin `DEFAULT`: bloquea el arranque contra
  *     una tabla con filas.
  */
@@ -239,6 +240,34 @@ const ADDITIVE_MIGRATIONS: Array<{ nombre: string; sql: string }> = [
     sql: `
       ALTER TABLE public.emisores
         ADD COLUMN IF NOT EXISTS categoria_rimpe character varying(20)
+    `,
+  },
+  {
+    /*
+     * El número de resolución del agente de retención cabía en 5 caracteres, y
+     * la ficha técnica admite hasta 8 (Anexo 21); Business lo guarda en 20.
+     * Una resolución larga reventaba el alta del emisor. 2026-09-30.
+     *
+     * **La única excepción a «nunca `ALTER TYPE`»**, y por qué no rompe la
+     * regla de fondo: **ensanchar** un `varchar` en PostgreSQL solo cambia el
+     * catálogo —no reescribe la tabla ni la bloquea más que un instante— y
+     * ningún valor guardado deja de caber. Solo se hace si sigue estrecha, así
+     * que repetirla en cada arranque no hace nada.
+     */
+    nombre: 'emisores: agente_retencion hasta 20',
+    sql: `
+      DO $$
+      BEGIN
+        IF (SELECT character_maximum_length
+              FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = 'emisores'
+               AND column_name = 'agente_retencion') < 20 THEN
+          ALTER TABLE public.emisores
+            ALTER COLUMN agente_retencion TYPE character varying(20);
+        END IF;
+      END
+      $$
     `,
   },
 ];
