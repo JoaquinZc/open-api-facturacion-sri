@@ -1,11 +1,15 @@
 import {
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { DatabaseService } from '../../database/database.service';
+import { claveCacheEmisorPorRuc } from '../../common/cache/emisor-cache-key';
 import {
   CreateEmisorDto,
   UpdateEmisorDto,
@@ -36,6 +40,7 @@ export class EmisoresService {
   constructor(
     private readonly db: DatabaseService,
     private readonly encryptionService: EncryptionService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   /**
@@ -331,7 +336,7 @@ export class EmisoresService {
 
   async update(id: string, dto: UpdateEmisorDto): Promise<EmisorResponseDto> {
     // Verificar que existe
-    await this.findOne(id);
+    const actual = await this.findOne(id);
 
     const updates: string[] = [];
     const values: unknown[] = [];
@@ -409,6 +414,14 @@ export class EmisoresService {
        RETURNING id`,
       values,
     );
+
+    /*
+     * 🔴 **La emisión lee el emisor de la caché**, no de la base
+     * (`findEmisorByRuc`, 5 min). Sin borrarla, un cambio de ambiente no llega
+     * a los comprobantes hasta que caduca: se seguiría emitiendo en pruebas
+     * después de pasar a producción, o al revés.
+     */
+    await this.cacheManager.del(claveCacheEmisorPorRuc(actual.ruc));
 
     this.logger.log(`Emisor actualizado: ${id}`);
     return this.findOne(id);

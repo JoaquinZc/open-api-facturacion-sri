@@ -38,6 +38,37 @@ export class SriBaseService {
   }
 
   /**
+   * El ambiente con el que sale un comprobante.
+   *
+   * 1. **El de la petición**, si lo trae. Es lo que usa una nota de crédito
+   *    para salir en el ambiente de su factura original.
+   * 2. **El del emisor** (`emisores.ambiente`). Es la fuente única: Business y
+   *    Fleet comparten el emisor de Darkmelon y ninguno de los dos manda el
+   *    ambiente, así que pasar a producción es cambiar esta columna — un clic
+   *    desde cualquiera de los dos paneles — y los dos lo siguen a la vez.
+   * 3. `SRI_ENVIRONMENT`, solo si el emisor no se encontró.
+   */
+  resolverAmbiente(
+    pedido: string | undefined,
+    emisor: { ambiente?: string | number | null } | null,
+  ): Ambiente {
+    if (pedido === Ambiente.PRUEBAS || pedido === Ambiente.PRODUCCION) {
+      return pedido;
+    }
+
+    // La columna admite también las formas legibles del alta antigua.
+    const delEmisor = String(emisor?.ambiente ?? '').toLowerCase();
+    if (delEmisor === '2' || delEmisor === 'produccion') {
+      return Ambiente.PRODUCCION;
+    }
+    if (delEmisor === '1' || delEmisor === 'pruebas') {
+      return Ambiente.PRUEBAS;
+    }
+
+    return this.getDefaultAmbiente();
+  }
+
+  /**
    * Valida una identificación antes de enviar al SRI
    * @throws BadRequestException si la identificación es inválida
    */

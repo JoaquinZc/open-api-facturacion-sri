@@ -64,7 +64,7 @@ export class FacturaService {
       ]);
 
       // Variables de configuración
-      const ambiente = dto.ambiente || this.base.getDefaultAmbiente();
+      const ambiente = this.base.resolverAmbiente(dto.ambiente, emisor);
       const tipoEmision = dto.tipoEmision || TipoEmision.NORMAL;
       const [day, month, year] = dto.fechaEmision.split('/');
       const fechaEmision = new Date(

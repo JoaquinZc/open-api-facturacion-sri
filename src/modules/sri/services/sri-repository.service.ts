@@ -4,6 +4,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../../../database';
+import { claveCacheEmisorPorRuc } from '../../../common/cache/emisor-cache-key';
 import {
   ComprobanteRecord,
   DetalleRecord,
@@ -141,7 +142,7 @@ export class SriRepositoryService {
 
   async findEmisorByRuc(ruc: string): Promise<EmisorRecord | null> {
     // Verificar cache Redis distribuido
-    const cacheKey = `emisor:ruc:${ruc}`;
+    const cacheKey = claveCacheEmisorPorRuc(ruc);
     const cached = await this.cacheManager.get<EmisorRecord>(cacheKey);
     if (cached) {
       return cached;

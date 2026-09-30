@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { EmisoresService } from './emisores.service';
 import { DatabaseService } from '../../database/database.service';
 import { EncryptionService } from '../../common/services/encryption.service';
@@ -20,6 +21,7 @@ jest.mock('node-forge');
 
 describe('EmisoresService', () => {
   let service: EmisoresService;
+  let cache: { del: jest.Mock };
   let db: jest.Mocked<DatabaseService>;
   let encryptionService: jest.Mocked<EncryptionService>;
 
@@ -103,10 +105,15 @@ describe('EmisoresService', () => {
             decrypt: jest.fn(),
           },
         },
+        {
+          provide: CACHE_MANAGER,
+          useValue: { del: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
     service = module.get(EmisoresService);
+    cache = module.get(CACHE_MANAGER);
     db = module.get(DatabaseService);
     encryptionService = module.get(EncryptionService);
 
@@ -498,6 +505,23 @@ describe('EmisoresService', () => {
       const updateSql = db.query.mock.calls[1][0] as string;
       expect(updateSql).toContain('razon_social');
       expect(updateSql).toContain('ambiente');
+    });
+
+    /**
+     * 🔴 La emisión lee el emisor de la caché. Sin borrarla, pasar a
+     * producción no llega a los comprobantes hasta que caduca.
+     */
+    it('borra la ficha cacheada del emisor para que la emisión vea el cambio', async () => {
+      db.query
+        .mockResolvedValueOnce({ rows: [mockEmisorRow] } as any) // findOne
+        .mockResolvedValueOnce({ rows: [{ id: 'emisor-uuid-1' }] } as any) // UPDATE
+        .mockResolvedValueOnce({ rows: [mockEmisorRow] } as any); // findOne
+
+      await service.update('emisor-uuid-1', {
+        ambiente: EmisorAmbiente.PRODUCCION,
+      });
+
+      expect(cache.del).toHaveBeenCalledWith(`emisor:ruc:${mockEmisorRow.ruc}`);
     });
 
     it('debe actualizar estado con normalización a mayúsculas', async () => {
