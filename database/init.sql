@@ -440,7 +440,7 @@ CREATE TABLE public.emisores (
     direccion_matriz text NOT NULL,
     obligado_contabilidad boolean DEFAULT false,
     contribuyente_especial character varying(20),
-    agente_retencion character varying(5),
+    agente_retencion character varying(20),
     contribuyente_rimpe boolean DEFAULT false,
     categoria_rimpe character varying(20),
     certificado_p12 bytea,
