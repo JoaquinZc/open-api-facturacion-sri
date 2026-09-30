@@ -5,6 +5,7 @@ import {
   TipoIdentificacion,
   FormaPago,
 } from '../constants';
+import type { LeyendaRimpe } from '../constants/rimpe';
 
 /**
  * Información tributaria común a todos los comprobantes
@@ -22,7 +23,7 @@ export interface InfoTributaria {
   secuencial: string;
   dirMatriz: string;
   agenteRetencion?: string;
-  contribuyenteRimpe?: 'CONTRIBUYENTE RÉGIMEN RIMPE';
+  contribuyenteRimpe?: LeyendaRimpe;
 }
 
 /**

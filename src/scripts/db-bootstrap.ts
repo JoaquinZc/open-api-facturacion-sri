@@ -228,6 +228,19 @@ const ADDITIVE_MIGRATIONS: Array<{ nombre: string; sql: string }> = [
         ADD COLUMN IF NOT EXISTS xml_autorizado_contenido text
     `,
   },
+  {
+    /*
+     * La categoría dentro del RIMPE (ficha técnica v2.32, Anexo 22): decide
+     * la leyenda del RIDE. `NULL` en todos los emisores de antes, y un RIMPE
+     * sin categoría se sigue imprimiendo como emprendedor, que es lo que ya
+     * hacía (`leyendaRimpe`). 2026-09-30.
+     */
+    nombre: 'emisores: categoría RIMPE',
+    sql: `
+      ALTER TABLE public.emisores
+        ADD COLUMN IF NOT EXISTS categoria_rimpe character varying(20)
+    `,
+  },
 ];
 
 async function applyAdditiveMigrations(client: Client): Promise<void> {

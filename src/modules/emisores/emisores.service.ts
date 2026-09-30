@@ -20,6 +20,7 @@ import {
 } from './dto';
 import * as forge from 'node-forge';
 import { EncryptionService } from '../../common/services/encryption.service';
+import type { CategoriaRimpe } from '../sri/constants/rimpe';
 import { JwtPayload, UserRole } from '../auth/dto/auth.dto';
 
 @Injectable()
@@ -30,7 +31,7 @@ export class EmisoresService {
   private static readonly EMISOR_COLUMNS = `
     id, ruc, razon_social, nombre_comercial, direccion_matriz,
     obligado_contabilidad, contribuyente_especial, agente_retencion,
-    contribuyente_rimpe, ambiente, estado, tenant_id,
+    contribuyente_rimpe, categoria_rimpe, ambiente, estado, tenant_id,
     certificado_p12 IS NOT NULL as tiene_certificado,
     certificado_valido_hasta, certificado_sujeto,
     eslogan, ciudad, email, web, telefono, logo_url,
@@ -314,8 +315,8 @@ export class EmisoresService {
         ruc, razon_social, nombre_comercial, direccion_matriz,
         obligado_contabilidad, contribuyente_especial, agente_retencion,
         contribuyente_rimpe, ambiente, estado, tenant_id,
-        eslogan, ciudad, email, web, telefono, logo_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        eslogan, ciudad, email, web, telefono, logo_url, categoria_rimpe
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING id`,
       [
         dto.ruc,
@@ -335,6 +336,7 @@ export class EmisoresService {
         dto.web || null,
         dto.telefono || null,
         dto.logoUrl || null,
+        dto.categoriaRimpe ?? null,
       ],
     );
 
@@ -377,6 +379,10 @@ export class EmisoresService {
     if (dto.contribuyenteRimpe !== undefined) {
       updates.push(`contribuyente_rimpe = $${paramIndex++}`);
       values.push(dto.contribuyenteRimpe);
+    }
+    if (dto.categoriaRimpe !== undefined) {
+      updates.push(`categoria_rimpe = $${paramIndex++}`);
+      values.push(dto.categoriaRimpe);
     }
     if (dto.ambiente !== undefined) {
       updates.push(`ambiente = $${paramIndex++}`);
@@ -564,6 +570,7 @@ export class EmisoresService {
       contribuyenteEspecial: row.contribuyente_especial as string | undefined,
       agenteRetencion: row.agente_retencion as string | undefined,
       contribuyenteRimpe: row.contribuyente_rimpe as boolean,
+      categoriaRimpe: (row.categoria_rimpe as CategoriaRimpe | null) ?? null,
       ambiente: row.ambiente as string,
       estado: row.estado as string,
       tenantId: row.tenant_id as string | undefined,

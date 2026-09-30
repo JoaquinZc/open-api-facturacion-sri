@@ -1,3 +1,4 @@
+import { leyendaRimpe } from '../constants/rimpe';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as QRCode from 'qrcode';
 // `bwip-js` es CommonJS puro (`export = BwipJs`), así que va como import por
@@ -656,16 +657,11 @@ export class RideService {
           comprobante.obligado_contabilidad === 'true'
             ? 'SI'
             : 'NO',
-        regimenRimpe:
-          comprobante.contribuyente_rimpe === true ||
-          comprobante.contribuyente_rimpe === 'true'
-            ? 'CONTRIBUYENTE RÉGIMEN RIMPE'
-            : '',
-        agenteRetencion:
-          comprobante.agente_retencion === true ||
-          comprobante.agente_retencion === 'true'
-            ? 'AGENTE DE RETENCIÓN'
-            : '',
+        regimenRimpe: leyendaRimpe(
+          comprobante.contribuyente_rimpe,
+          comprobante.categoria_rimpe,
+        ),
+        agenteRetencion: leyendaAgenteRetencion(comprobante.agente_retencion),
         /*
          * Vacío a propósito: la imagen la coloca `docx-imagenes.ts` metiendo
          * los bytes en la plantilla. Se deja la clave para que Carbone no
@@ -777,16 +773,15 @@ export class RideService {
           ? 'SI'
           : 'NO',
       contribuyenteEspecial: comprobante.contribuyente_especial || '',
-      agenteRetencion:
-        comprobante.agente_retencion === true ||
-        comprobante.agente_retencion === 'true'
-          ? 'SI'
-          : '',
-      contribuyenteRimpe:
-        comprobante.contribuyente_rimpe === true ||
-        comprobante.contribuyente_rimpe === 'true'
-          ? 'SI'
-          : '',
+      agenteRetencion: leyendaAgenteRetencion(comprobante.agente_retencion)
+        ? 'SI'
+        : '',
+      contribuyenteRimpe: leyendaRimpe(
+        comprobante.contribuyente_rimpe,
+        comprobante.categoria_rimpe,
+      )
+        ? 'SI'
+        : '',
 
       // Comprobante
       tipoComprobanteDescripcion: tipoCompDesc,
@@ -811,14 +806,11 @@ export class RideService {
         comprobante.contribuyente_especial
           ? `CONTRIBUYENTE ESPECIAL Nº ${comprobante.contribuyente_especial}`
           : '',
-        comprobante.contribuyente_rimpe === true ||
-        comprobante.contribuyente_rimpe === 'true'
-          ? 'CONTRIBUYENTE RÉGIMEN RIMPE'
-          : '',
-        comprobante.agente_retencion === true ||
-        comprobante.agente_retencion === 'true'
-          ? 'AGENTE DE RETENCIÓN'
-          : '',
+        leyendaRimpe(
+          comprobante.contribuyente_rimpe,
+          comprobante.categoria_rimpe,
+        ),
+        leyendaAgenteRetencion(comprobante.agente_retencion),
       ]
         .filter(Boolean)
         .join('  ·  '),
@@ -1039,4 +1031,23 @@ export class RideService {
     };
     return descripciones[codigo] || codigo;
   }
+}
+
+/**
+ * «Agente de retención», con su resolución (ficha técnica, Anexo 21).
+ *
+ * 🔴 `emisores.agente_retencion` guarda el **número de resolución** (texto),
+ * no un booleano. Antes se comparaba con `true`, así que la leyenda no salía
+ * nunca aunque el emisor lo fuera (encontrado el 2026-09-30). Se aceptan los
+ * dos por si algún emisor viejo guardó `'true'`.
+ */
+export function leyendaAgenteRetencion(valor: unknown): string {
+  if (valor === true || valor === 'true') return 'AGENTE DE RETENCIÓN';
+  if (typeof valor === 'string') {
+    const resolucion = valor.trim();
+    if (resolucion && resolucion !== 'false' && resolucion !== '0') {
+      return `AGENTE DE RETENCIÓN RESOLUCIÓN Nº ${resolucion}`;
+    }
+  }
+  return '';
 }

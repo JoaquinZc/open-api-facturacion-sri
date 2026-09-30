@@ -442,6 +442,7 @@ CREATE TABLE public.emisores (
     contribuyente_especial character varying(20),
     agente_retencion character varying(5),
     contribuyente_rimpe boolean DEFAULT false,
+    categoria_rimpe character varying(20),
     certificado_p12 bytea,
     certificado_password text,
     ambiente character varying(20) DEFAULT '1'::character varying,
