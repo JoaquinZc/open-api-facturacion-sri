@@ -447,6 +447,7 @@ describe('NotaCreditoService — Emisión', () => {
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'comprobante.persistencia_fallida',
       expect.objectContaining({
+        emisorId: 'emisor-uuid-1',
         claveAcceso: expect.any(String),
         error: 'DB connection lost',
         tipoComprobante: '04',

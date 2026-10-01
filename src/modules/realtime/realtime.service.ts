@@ -4,6 +4,7 @@ import { Subject, Observable } from 'rxjs';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { JwtPayload, UserRole } from '../auth/dto/auth.dto';
+import { DatabaseService } from '../../database/database.service';
 
 export interface RealtimeEvent {
   event: string;
@@ -26,6 +27,7 @@ export class RealtimeService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly db: DatabaseService,
   ) {
     this.jwtSecret = this.configService.get<string>('jwt.secret')!;
   }
@@ -91,69 +93,110 @@ export class RealtimeService {
     }
   }
 
+  /**
+   * Los eventos de comprobante, solo al tenant del emisor.
+   *
+   * 🔴 Ningún emisor de estos eventos pone `tenantId`, y `broadcast` sin tenant
+   * los manda a **todas** las conexiones: cualquier cuenta de cualquier negocio
+   * veía las claves de acceso de los demás. Ahora el tenant sale del emisor, y si
+   * no se puede saber, el evento solo llega al SUPERADMIN. 2026-09-30, R0.
+   */
+  private async broadcastComprobante(
+    event: string,
+    data: Record<string, unknown>,
+    payload: { tenantId?: string | null; emisorId?: string | null },
+  ): Promise<void> {
+    const tenantId = payload.tenantId ?? (await this.tenantDe(payload));
+    if (tenantId) {
+      this.broadcast(event, data, tenantId);
+      return;
+    }
+    for (const conn of this.connections.values()) {
+      if (conn.rol === UserRole.SUPERADMIN) conn.subject.next({ event, data });
+    }
+  }
+
+  private async tenantDe(payload: {
+    emisorId?: string | null;
+  }): Promise<string | null> {
+    if (!payload.emisorId) return null;
+    try {
+      const row = await this.db.queryOne<{ tenant_id: string | null }>(
+        'SELECT tenant_id FROM emisores WHERE id = $1',
+        [payload.emisorId],
+      );
+      return row?.tenant_id ?? null;
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo resolver el tenant del emisor ${payload.emisorId}: ${(error as Error).message}`,
+      );
+      return null;
+    }
+  }
+
   @OnEvent('comprobante.autorizado')
-  handleComprobanteAutorizado(payload: any): void {
-    this.broadcast(
+  async handleComprobanteAutorizado(payload: any): Promise<void> {
+    await this.broadcastComprobante(
       'comprobante.autorizado',
       {
         claveAcceso: payload.claveAcceso,
         estado: payload.estado,
         tipoComprobante: payload.tipoComprobante,
       },
-      payload.tenantId,
+      payload,
     );
   }
 
   @OnEvent('comprobante.rechazado')
-  handleComprobanteRechazado(payload: any): void {
-    this.broadcast(
+  async handleComprobanteRechazado(payload: any): Promise<void> {
+    await this.broadcastComprobante(
       'comprobante.rechazado',
       {
         claveAcceso: payload.claveAcceso,
         estado: payload.estado,
         tipoComprobante: payload.tipoComprobante,
       },
-      payload.tenantId,
+      payload,
     );
   }
 
   @OnEvent('comprobante.creado')
-  handleComprobanteCreado(payload: any): void {
-    this.broadcast(
+  async handleComprobanteCreado(payload: any): Promise<void> {
+    await this.broadcastComprobante(
       'comprobante.creado',
       {
         claveAcceso: payload.claveAcceso,
         estado: payload.estado,
         tipoComprobante: payload.tipoComprobante,
       },
-      payload.tenantId,
+      payload,
     );
   }
 
   @OnEvent('comprobante.anulado')
-  handleComprobanteAnulado(payload: any): void {
-    this.broadcast(
+  async handleComprobanteAnulado(payload: any): Promise<void> {
+    await this.broadcastComprobante(
       'comprobante.anulado',
       {
         claveAcceso: payload.claveAcceso,
       },
-      payload.tenantId,
+      payload,
     );
   }
 
   @OnEvent('comprobante.persistencia_fallida')
-  handleComprobantePersistenciaFallida(payload: any): void {
+  async handleComprobantePersistenciaFallida(payload: any): Promise<void> {
     this.logger.warn(
       `Persistencia fallida para comprobante ${payload.claveAcceso}`,
     );
-    this.broadcast(
+    await this.broadcastComprobante(
       'comprobante.persistencia_fallida',
       {
         claveAcceso: payload.claveAcceso,
         tipoComprobante: payload.tipoComprobante,
         emisorRuc: payload.emisorRuc,
       },
-      payload.tenantId,
+      payload,
     );
   }
 

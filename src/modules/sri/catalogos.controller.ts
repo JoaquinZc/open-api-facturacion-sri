@@ -1,6 +1,16 @@
-import { Controller, Get, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { CatalogoValidatorService } from './services/catalogo-validator.service';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Logger,
+  Query,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import {
+  CatalogoValidatorService,
+  TIPO_POR_CODIGO_IMPUESTO,
+} from './services/catalogo-validator.service';
+import { esFechaIso, hoyEnEcuador } from '../../common/utils/fecha-ecuador';
 
 @ApiTags('Catálogos SRI')
 @Controller('catalogos')
@@ -60,37 +70,82 @@ export class CatalogosController {
   @Get('retenciones')
   @ApiOperation({
     summary: 'Listar códigos de retención',
-    description: 'Obtiene todos los códigos de retención vigentes',
+    description:
+      'Los códigos de renta, IVA e ISD vigentes a una fecha (por defecto, hoy en Ecuador). Es la fecha de emisión de la retención la que decide el porcentaje: la tabla de renta cambió el 01-03-2026.',
+  })
+  @ApiQuery({
+    name: 'fecha',
+    required: false,
+    description: 'Fecha de emisión, aaaa-mm-dd. Por defecto, hoy en Ecuador.',
+    example: '2026-09-30',
   })
   @ApiResponse({ status: 200, description: 'Lista de códigos de retención' })
-  async listarRetenciones(): Promise<{ retenciones: any[] }> {
+  @ApiResponse({ status: 400, description: 'Fecha con formato inválido' })
+  async listarRetenciones(
+    @Query('fecha') fechaPedida?: string,
+  ): Promise<{ fecha: string; retenciones: any[] }> {
     this.logger.log('GET /catalogos/retenciones');
+    const fecha = this.fechaDeConsulta(fechaPedida);
 
-    const renta = await this.catalogoService.getRetencionesPorTipo('RENTA');
-    const iva = await this.catalogoService.getRetencionesPorTipo('IVA');
+    const retenciones = await Promise.all(
+      Object.entries(TIPO_POR_CODIGO_IMPUESTO).map(
+        async ([codigoImpuesto, tipo]) => ({
+          tipo,
+          codigoImpuesto,
+          codigos: (
+            await this.catalogoService.getRetencionesPorTipo(tipo, fecha)
+          ).map((r) => ({
+            codigo: r.codigo,
+            descripcion: r.descripcion,
+            porcentaje: r.porcentaje,
+            vigenteDesde: r.vigenteDesde,
+            vigenteHasta: r.vigenteHasta,
+          })),
+        }),
+      ),
+    );
 
+    return { fecha, retenciones };
+  }
+
+  @Get('sustentos')
+  @ApiOperation({
+    summary: 'Listar sustentos tributarios',
+    description:
+      'Tabla 5 del Catálogo ATS: los codSustento vigentes a una fecha y qué codDocSustento admite cada uno.',
+  })
+  @ApiQuery({
+    name: 'fecha',
+    required: false,
+    description: 'aaaa-mm-dd. Por defecto, hoy en Ecuador.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de sustentos tributarios' })
+  async listarSustentos(
+    @Query('fecha') fechaPedida?: string,
+  ): Promise<{ fecha: string; sustentos: any[] }> {
+    this.logger.log('GET /catalogos/sustentos');
+    const fecha = this.fechaDeConsulta(fechaPedida);
+
+    const sustentos = await this.catalogoService.getSustentos(fecha);
     return {
-      retenciones: [
-        {
-          tipo: 'RENTA',
-          codigoImpuesto: '1',
-          codigos: renta.map((r) => ({
-            codigo: r.codigo,
-            descripcion: r.descripcion,
-            porcentaje: r.porcentaje,
-          })),
-        },
-        {
-          tipo: 'IVA',
-          codigoImpuesto: '2',
-          codigos: iva.map((r) => ({
-            codigo: r.codigo,
-            descripcion: r.descripcion,
-            porcentaje: r.porcentaje,
-          })),
-        },
-      ],
+      fecha,
+      sustentos: sustentos.map((s) => ({
+        codigo: s.codigo,
+        descripcion: s.descripcion,
+        documentosSustento: s.documentos,
+      })),
     };
+  }
+
+  /** `aaaa-mm-dd` pedida, o hoy en Ecuador. */
+  private fechaDeConsulta(fecha?: string): string {
+    if (fecha === undefined || fecha === '') return hoyEnEcuador();
+    if (!esFechaIso(fecha)) {
+      throw new BadRequestException(
+        `fecha debe ser una fecha aaaa-mm-dd válida, no «${fecha}»`,
+      );
+    }
+    return fecha;
   }
 
   @Get('formas-pago')

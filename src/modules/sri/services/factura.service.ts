@@ -513,6 +513,7 @@ export class FacturaService {
 
       // Emitir evento de alerta para reconciliación posterior
       this.eventEmitter.emit('comprobante.persistencia_fallida', {
+        emisorId,
         claveAcceso,
         emisorRuc: dto.emisor.ruc,
         tipoComprobante: TipoComprobante.FACTURA,

@@ -1,5 +1,8 @@
 import { Test } from '@nestjs/testing';
-import { CatalogoValidatorService } from './catalogo-validator.service';
+import {
+  CatalogoValidatorService,
+  valorRetenidoEsperado,
+} from './catalogo-validator.service';
 import { DatabaseService } from '../../../database/database.service';
 
 describe('CatalogoValidatorService', () => {
@@ -32,24 +35,58 @@ describe('CatalogoValidatorService', () => {
     },
   ];
 
+  // Como las devuelve `loadCache`: fechas ya en texto (`to_char`).
   const mockRetencionesRows = [
+    // El 312 cambió el 01-03-2026 (NAC-DGERCGC26-00000009): dos vigencias.
     {
       tipo: 'RENTA',
       codigo: '312',
-      descripcion: 'Servicios profesionales',
-      porcentaje: '1.00',
+      descripcion: 'Bienes muebles (tabla 2024)',
+      porcentaje: '1.75',
+      vigente_desde: '2024-03-01',
+      vigente_hasta: '2026-02-28',
     },
     {
+      tipo: 'RENTA',
+      codigo: '312',
+      descripcion: 'Transferencia de bienes muebles de naturaleza corporal',
+      porcentaje: '2.00',
+      vigente_desde: '2026-03-01',
+      vigente_hasta: null,
+    },
+    // Código de IVA «1» (30 %): el mismo texto que un código de renta posible.
+    {
       tipo: 'IVA',
-      codigo: '701',
-      descripcion: 'Retención IVA 10%',
-      porcentaje: '10.00',
+      codigo: '1',
+      descripcion: 'Retención 30 % del IVA (bienes)',
+      porcentaje: '30.00',
+      vigente_desde: '2024-01-01',
+      vigente_hasta: null,
     },
     {
       tipo: 'ISD',
-      codigo: '451',
-      descripcion: 'ISD salida',
-      porcentaje: '2.00',
+      codigo: '4580',
+      descripcion: 'Retención ISD',
+      porcentaje: '5.00',
+      vigente_desde: '2024-01-01',
+      vigente_hasta: null,
+    },
+  ];
+
+  const mockSustentosRows = [
+    {
+      codigo: '01',
+      descripcion: 'Crédito Tributario para declaración de IVA',
+      documentos_sustento: ['01', '03', '04', '05'],
+      vigente_desde: '2000-01-01',
+      vigente_hasta: null,
+    },
+    {
+      codigo: '02',
+      descripcion: 'Costo o Gasto para declaración de IR',
+      documentos_sustento: ['01', '02', '03'],
+      vigente_desde: '2000-01-01',
+      vigente_hasta: null,
     },
   ];
 
@@ -109,6 +146,9 @@ describe('CatalogoValidatorService', () => {
       }
       if (sql.includes('catalogo_motivos_traslado')) {
         return { rows: mockMotivosTrasladoRows } as any;
+      }
+      if (sql.includes('catalogo_sustento_tributario')) {
+        return { rows: mockSustentosRows } as any;
       }
       return { rows: [] } as any;
     });
@@ -198,17 +238,35 @@ describe('CatalogoValidatorService', () => {
   // ── validateRetencion ─────────────────────────────────────────
 
   describe('validateRetencion', () => {
-    it('debe validar retencion RENTA 312', async () => {
-      const result = await service.validateRetencion('RENTA', '312');
-      expect(result.valid).toBe(true);
-      expect(result.retencion).toBeDefined();
-      expect(result.retencion!.descripcion).toBe('Servicios profesionales');
+    it('elige la vigencia del día pedido', async () => {
+      const antes = await service.validateRetencion(
+        'RENTA',
+        '312',
+        '2026-02-15',
+      );
+      const despues = await service.validateRetencion(
+        'RENTA',
+        '312',
+        '2026-03-01',
+      );
+      expect(antes.retencion!.porcentaje).toBe(1.75);
+      expect(despues.retencion!.porcentaje).toBe(2);
+      expect(despues.retencion!.vigenteDesde).toBe('2026-03-01');
     });
 
-    it('debe validar retencion IVA 701', async () => {
-      const result = await service.validateRetencion('IVA', '701');
-      expect(result.valid).toBe(true);
-      expect(result.retencion!.porcentaje).toBe(10);
+    it('sin fecha, usa la de hoy: el 312 vale el 2 %', async () => {
+      const result = await service.validateRetencion('RENTA', '312');
+      expect(result.retencion!.porcentaje).toBe(2);
+    });
+
+    it('existe pero no está vigente ese día', async () => {
+      const result = await service.validateRetencion(
+        'RENTA',
+        '312',
+        '2023-12-31',
+      );
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('no está vigente el 2023-12-31');
     });
 
     it('debe retornar invalid cuando la retencion no existe', async () => {
@@ -221,32 +279,115 @@ describe('CatalogoValidatorService', () => {
   // ── validateRetenciones ───────────────────────────────────────
 
   describe('validateRetenciones', () => {
-    it('debe validar retenciones con tipo RENTA (codigo no empieza con 7 ni 45)', async () => {
-      const result = await service.validateRetenciones([
-        { codigo: '1', codigoRetencion: '312' },
-      ]);
+    const HOY = '2026-09-30';
+
+    it('el tipo sale de `codigo`, no del prefijo: 2 + «1» es el 30 % del IVA', async () => {
+      // Antes «1» no empezaba por 7 y se buscaba como renta: no existía.
+      const result = await service.validateRetenciones(
+        [
+          {
+            codigo: '2',
+            codigoRetencion: '1',
+            baseImponible: 15,
+            porcentajeRetener: 30,
+            valorRetenido: 4.5,
+          },
+        ],
+        HOY,
+      );
+      expect(result).toEqual({ valid: true, errors: [] });
+    });
+
+    it('el mismo «1» como renta no existe', async () => {
+      const result = await service.validateRetenciones(
+        [{ codigo: '1', codigoRetencion: '1' }],
+        HOY,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]).toContain('de tipo RENTA no encontrado');
+    });
+
+    it('ISD por su código 6', async () => {
+      const result = await service.validateRetenciones(
+        [{ codigo: '6', codigoRetencion: '4580' }],
+        HOY,
+      );
       expect(result.valid).toBe(true);
     });
 
-    it('debe inferir tipo IVA cuando codigoRetencion empieza con 7', async () => {
-      const result = await service.validateRetenciones([
-        { codigo: '2', codigoRetencion: '701' },
-      ]);
+    it('rechaza un codigo de impuesto que no es 1, 2 ni 6', async () => {
+      const result = await service.validateRetenciones(
+        [{ codigo: '3', codigoRetencion: '312' }],
+        HOY,
+      );
+      expect(result.errors[0]).toContain('1 (renta), 2 (IVA) o 6 (ISD)');
+    });
+
+    it('rechaza el porcentaje de la tabla derogada', async () => {
+      // 312 al 1,75 % era la tabla de 2024; desde el 01-03-2026 es el 2 %.
+      const result = await service.validateRetenciones(
+        [
+          {
+            codigo: '1',
+            codigoRetencion: '312',
+            baseImponible: 100,
+            porcentajeRetener: 1.75,
+            valorRetenido: 1.75,
+          },
+        ],
+        HOY,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]).toContain('es 2 %, no 1.75 %');
+    });
+
+    it('acepta el porcentaje de la tabla derogada si la fecha es anterior', async () => {
+      const result = await service.validateRetenciones(
+        [
+          {
+            codigo: '1',
+            codigoRetencion: '312',
+            baseImponible: 100,
+            porcentajeRetener: 1.75,
+            valorRetenido: 1.75,
+          },
+        ],
+        '2026-02-27',
+      );
       expect(result.valid).toBe(true);
     });
 
-    it('debe inferir tipo ISD cuando codigoRetencion empieza con 45', async () => {
-      const result = await service.validateRetenciones([
-        { codigo: '6', codigoRetencion: '451' },
-      ]);
-      expect(result.valid).toBe(true);
+    it('valorRetenido = base × % / 100, redondeado; tolera un centavo', async () => {
+      // 125,90 × 2 % = 2,518 → 2,52.
+      const con = (valorRetenido: number) =>
+        service.validateRetenciones(
+          [
+            {
+              codigo: '1',
+              codigoRetencion: '312',
+              baseImponible: 125.9,
+              porcentajeRetener: 2,
+              valorRetenido,
+            },
+          ],
+          HOY,
+        );
+      expect((await con(2.52)).valid).toBe(true);
+      expect((await con(2.51)).valid).toBe(true);
+      expect((await con(2.53)).valid).toBe(true);
+      const mal = await con(2.5);
+      expect(mal.valid).toBe(false);
+      expect(mal.errors[0]).toContain('= 2.52, no 2.5');
     });
 
     it('debe retornar errors cuando alguna retencion es invalida', async () => {
-      const result = await service.validateRetenciones([
-        { codigo: '1', codigoRetencion: '312' },
-        { codigo: '1', codigoRetencion: '999' },
-      ]);
+      const result = await service.validateRetenciones(
+        [
+          { codigo: '1', codigoRetencion: '312' },
+          { codigo: '1', codigoRetencion: '999' },
+        ],
+        HOY,
+      );
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
     });
@@ -254,6 +395,54 @@ describe('CatalogoValidatorService', () => {
     it('debe retornar valid true para array vacio', async () => {
       const result = await service.validateRetenciones([]);
       expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('valorRetenidoEsperado', () => {
+    it('redondea la mitad hacia arriba, sin errores de coma flotante', () => {
+      // 100,50 × 1 % = 1,005: en coma flotante 1.005 * 100 es 100.4999…
+      expect(valorRetenidoEsperado(100.5, 1)).toBe(1.01);
+      expect(valorRetenidoEsperado(125.9, 1.75)).toBe(2.2);
+      expect(valorRetenidoEsperado(1000, 2)).toBe(20);
+      expect(valorRetenidoEsperado(0, 30)).toBe(0);
+    });
+  });
+
+  // ── validateSustento (Tabla 5) ────────────────────────────────
+
+  describe('validateSustento', () => {
+    it('acepta un sustento que admite el documento', async () => {
+      const result = await service.validateSustento('01', '01', '2026-09-30');
+      expect(result.valid).toBe(true);
+    });
+
+    it('rechaza el crédito de IVA (01) sobre una nota de venta (02)', async () => {
+      const result = await service.validateSustento('01', '02', '2026-09-30');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('no admite el documento 02');
+    });
+
+    it('rechaza un sustento que no existe', async () => {
+      const result = await service.validateSustento('99', '01', '2026-09-30');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('no encontrado');
+    });
+
+    it('si la tabla de sustento no existe, el resto de catálogos sigue cargando', async () => {
+      db.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('catalogo_sustento_tributario')) {
+          throw new Error(
+            'relation "catalogo_sustento_tributario" does not exist',
+          );
+        }
+        if (sql.includes('catalogo_tarifas_impuesto')) {
+          return { rows: mockTarifasRows } as any;
+        }
+        return { rows: [] } as any;
+      });
+
+      expect((await service.validateImpuesto('2', '2')).valid).toBe(true);
+      expect((await service.validateSustento('01', '01')).valid).toBe(false);
     });
   });
 
@@ -369,16 +558,34 @@ describe('CatalogoValidatorService', () => {
   });
 
   describe('getRetencionesPorTipo', () => {
-    it('debe retornar retenciones filtradas por tipo RENTA', async () => {
+    it('debe retornar retenciones filtradas por tipo RENTA, una por código', async () => {
       const result = await service.getRetencionesPorTipo('RENTA');
       expect(result).toHaveLength(1);
-      expect(result[0].codigo).toBe('312');
+      expect(result[0]).toMatchObject({ codigo: '312', porcentaje: 2 });
+    });
+
+    it('a una fecha pasada devuelve la vigencia de entonces', async () => {
+      const result = await service.getRetencionesPorTipo('RENTA', '2025-06-01');
+      expect(result[0].porcentaje).toBe(1.75);
     });
 
     it('debe retornar retenciones filtradas por tipo IVA', async () => {
       const result = await service.getRetencionesPorTipo('IVA');
       expect(result).toHaveLength(1);
-      expect(result[0].codigo).toBe('701');
+      expect(result[0].codigo).toBe('1');
+    });
+
+    it('incluye el ISD', async () => {
+      const result = await service.getRetencionesPorTipo('ISD');
+      expect(result.map((r) => r.codigo)).toEqual(['4580']);
+    });
+  });
+
+  describe('getSustentos', () => {
+    it('devuelve los sustentos vigentes con sus documentos', async () => {
+      const result = await service.getSustentos();
+      expect(result.map((s) => s.codigo)).toEqual(['01', '02']);
+      expect(result[1].documentos).toContain('02');
     });
   });
 
@@ -418,9 +625,9 @@ describe('CatalogoValidatorService', () => {
       await service.validateImpuesto('2', '2');
       await service.validateImpuesto('2', '2');
 
-      // loadCache hace 6 queries por carga
+      // loadCache hace 7 queries por carga (la 7.ª, el sustento tributario)
       const totalQueries = db.query.mock.calls.length;
-      expect(totalQueries).toBe(6);
+      expect(totalQueries).toBe(7);
     });
 
     it('debe recargar cache despues de forceRefreshCache', async () => {
@@ -430,7 +637,7 @@ describe('CatalogoValidatorService', () => {
       await service.forceRefreshCache();
       const queriesAfterRefresh = db.query.mock.calls.length;
 
-      expect(queriesAfterRefresh).toBe(queriesAfterFirst + 6);
+      expect(queriesAfterRefresh).toBe(queriesAfterFirst + 7);
     });
 
     it('debe reutilizar cache entre diferentes validaciones', async () => {
@@ -440,7 +647,7 @@ describe('CatalogoValidatorService', () => {
       await service.validateTipoIdentificacion('04');
 
       const totalQueries = db.query.mock.calls.length;
-      expect(totalQueries).toBe(6);
+      expect(totalQueries).toBe(7);
     });
   });
 

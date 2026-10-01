@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { CatalogoValidatorService } from '../sri/services/catalogo-validator.service';
+import { hoyEnEcuador } from '../../common/utils/fecha-ecuador';
 import type {
   CreateRetencionDto,
   UpdateRetencionDto,
@@ -40,14 +41,22 @@ export class CatalogosAdminService {
     return this.mapRow(result.rows[0]);
   }
 
+  /**
+   * Un código puede tener varias filas, una por vigencia: cuando el SRI cambia
+   * un porcentaje se **añade** la fila nueva con su `vigenteDesde` y la vieja
+   * sigue valiendo para las fechas anteriores. Por eso el duplicado se mira
+   * por `(tipo, codigo, vigente_desde)`, que es la clave única de la tabla, y no
+   * por `(tipo, codigo)`, que impedía registrar el cambio. R0, 2026-09-30.
+   */
   async createRetencion(dto: CreateRetencionDto): Promise<any> {
+    const vigenteDesde = dto.vigenteDesde ?? hoyEnEcuador();
     const existing = await this.db.query<any>(
-      `SELECT id FROM catalogo_retenciones WHERE tipo = $1 AND codigo = $2`,
-      [dto.tipo, dto.codigo],
+      `SELECT id FROM catalogo_retenciones WHERE tipo = $1 AND codigo = $2 AND vigente_desde = $3`,
+      [dto.tipo, dto.codigo, vigenteDesde],
     );
     if (existing.rows.length > 0) {
       throw new ConflictException(
-        `Ya existe una retención con tipo ${dto.tipo} y código ${dto.codigo}`,
+        `Ya existe una retención con tipo ${dto.tipo} y código ${dto.codigo} vigente desde ${vigenteDesde}`,
       );
     }
 
@@ -60,7 +69,7 @@ export class CatalogosAdminService {
         dto.codigo,
         dto.descripcion,
         dto.porcentaje,
-        dto.vigenteDesde ?? new Date().toISOString().split('T')[0],
+        vigenteDesde,
         dto.vigenteHasta ?? null,
         dto.activo ?? true,
       ],

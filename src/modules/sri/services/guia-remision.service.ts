@@ -324,6 +324,7 @@ export class GuiaRemisionService {
         `CRÍTICO: GR ${claveAcceso} autorizada por SRI pero NO persistida: ${(error as Error).message}`,
       );
       this.eventEmitter.emit('comprobante.persistencia_fallida', {
+        emisorId,
         claveAcceso,
         emisorRuc: dto.emisor.ruc,
         tipoComprobante: TipoComprobante.GUIA_REMISION,

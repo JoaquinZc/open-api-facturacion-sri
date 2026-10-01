@@ -258,7 +258,7 @@ export interface ImpuestoRetenido {
   porcentajeRetener: number;
   valorRetenido: number;
   codDocSustento: string;
-  codSustento?: string; // Tipo sustento tributario (distinto de codDocSustento)
+  codSustento: string; // Sustento tributario, Tabla 5 del Catálogo ATS (no es codDocSustento)
   numDocSustento: string;
   fechaEmisionDocSustento: string;
   totalSinImpuestos: number;

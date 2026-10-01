@@ -6,6 +6,7 @@ import {
 } from './index';
 import { Ambiente } from '../constants';
 import { DatabaseService } from '../../../database';
+import type { RetencionAValidar } from './catalogo-validator.service';
 
 /**
  * Servicio base con métodos compartidos entre todos los tipos de comprobante SRI.
@@ -139,22 +140,27 @@ export class SriBaseService {
   }
 
   /**
-   * Valida los códigos de retención contra el catálogo
+   * Valida las retenciones contra el catálogo **vigente el día de emisión**
+   * (`aaaa-mm-dd`): código, porcentaje e importe. Ver
+   * `CatalogoValidatorService.validateRetenciones`.
    */
   async validarRetencionesCatalogo(
-    retenciones: Array<{ codigo: string; codigoRetencion: string }>,
+    retenciones: RetencionAValidar[],
+    fechaEmision?: string,
   ): Promise<void> {
     if (!retenciones || retenciones.length === 0) {
       return;
     }
 
-    const result =
-      await this.catalogoValidator.validateRetenciones(retenciones);
+    const result = await this.catalogoValidator.validateRetenciones(
+      retenciones,
+      fechaEmision,
+    );
 
     if (!result.valid) {
       this.logger.warn(`Retenciones inválidas: ${result.errors.join(', ')}`);
       throw new BadRequestException({
-        message: 'Códigos de retención inválidos',
+        message: 'Retenciones inválidas',
         errors: result.errors,
       });
     }
@@ -162,6 +168,30 @@ export class SriBaseService {
     this.logger.log(
       `Validadas ${retenciones.length} retenciones contra catálogo`,
     );
+  }
+
+  /**
+   * Valida el sustento tributario (Tabla 5 del Catálogo ATS) y que admita el
+   * documento sustento.
+   */
+  async validarSustentoCatalogo(
+    codSustento: string,
+    codDocSustento: string,
+    fechaEmision?: string,
+  ): Promise<void> {
+    const result = await this.catalogoValidator.validateSustento(
+      codSustento,
+      codDocSustento,
+      fechaEmision,
+    );
+
+    if (!result.valid) {
+      this.logger.warn(`Sustento tributario inválido: ${result.error}`);
+      throw new BadRequestException({
+        message: 'Sustento tributario inválido',
+        error: result.error,
+      });
+    }
   }
 
   /**

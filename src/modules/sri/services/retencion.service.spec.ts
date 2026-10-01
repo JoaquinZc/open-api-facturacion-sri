@@ -77,6 +77,7 @@ describe('RetencionService — Emisión', () => {
           porcentajeRetener: 2,
           valorRetenido: 20,
           codDocSustento: '01',
+          codSustento: '01',
           numDocSustento: '001-001-000000001',
           fechaEmisionDocSustento: '01/02/2026',
           totalSinImpuestos: 1000,
@@ -172,6 +173,8 @@ describe('RetencionService — Emisión', () => {
             validarDocumentoSustentoCatalogo: jest
               .fn()
               .mockResolvedValue(undefined),
+            validarSustentoCatalogo: jest.fn().mockResolvedValue(undefined),
+            validarFormasPagoCatalogo: jest.fn().mockResolvedValue(undefined),
             getDefaultAmbiente: jest.fn().mockReturnValue(Ambiente.PRUEBAS),
             // La regla real, con el default del doble: así la prueba ve el orden
             // petición → emisor → configuración sin reimplementarlo.
@@ -454,10 +457,58 @@ describe('RetencionService — Emisión', () => {
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'comprobante.persistencia_fallida',
       expect.objectContaining({
+        emisorId: 'emisor-uuid-1',
         claveAcceso: expect.any(String),
         error: 'DB connection lost',
         tipoComprobante: '07',
       }),
+    );
+  });
+
+  // ==========================================
+  // U-RET-13b/c: los eventos llevan el emisor (fuga entre negocios, R0)
+  // ==========================================
+  // Sin `emisorId`, `WebhooksService.emit` no podía filtrar y la retención
+  // autorizada de un negocio llegaba al webhook de todos los demás.
+  it('U-RET-13b: comprobante.autorizado sale con el emisorId del emisor', async () => {
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
+    sriSoapClient.enviarYAutorizar.mockResolvedValue({
+      success: true,
+      claveAcceso: '0702202607092438363100110010010000000161245294017',
+      estado: 'AUTORIZADO',
+      numeroAutorizacion: '1234567890',
+      mensajes: [],
+    } as any);
+
+    await service.emitirRetencion(createValidDto());
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'comprobante.autorizado',
+      expect.objectContaining({
+        emisorId: 'emisor-uuid-1',
+        tipoComprobante: '07',
+      }),
+    );
+  });
+
+  it('U-RET-13c: comprobante.rechazado sale con el emisorId del emisor', async () => {
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
+    sriSoapClient.enviarYAutorizar.mockResolvedValue({
+      success: false,
+      claveAcceso: '0702202607092438363100110010010000000161245294017',
+      estado: 'RECHAZADO',
+      mensajes: [{ identificador: '1', mensaje: 'x', tipo: 'ERROR' }],
+    } as any);
+
+    await service.emitirRetencion(createValidDto());
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'comprobante.rechazado',
+      expect.objectContaining({ emisorId: 'emisor-uuid-1' }),
     );
   });
 
@@ -515,6 +566,82 @@ describe('RetencionService — Emisión', () => {
     expect(claveAccesoService.generate).toHaveBeenCalledWith(
       expect.objectContaining({ ambiente: Ambiente.PRUEBAS }),
     );
+  });
+
+  // ==========================================
+  // U-RET-18…21: fase R0 de retenciones
+  // ==========================================
+  const autorizar = () => {
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
+    sriSoapClient.enviarYAutorizar.mockResolvedValue({
+      success: true,
+      claveAcceso: '0702202607092438363100110010010000000161245294017',
+      estado: 'AUTORIZADO',
+      mensajes: [],
+    } as any);
+  };
+
+  it('U-RET-18: valida las retenciones a la fecha de emisión, no a la de hoy', async () => {
+    autorizar();
+
+    await service.emitirRetencion(createValidDto()); // fechaEmision 07/02/2026
+
+    expect(base.validarRetencionesCatalogo).toHaveBeenCalledWith(
+      expect.any(Array),
+      '2026-02-07',
+    );
+  });
+
+  it('U-RET-19: valida el sustento contra su documento y rechaza si no lo admite', async () => {
+    base.validarSustentoCatalogo.mockRejectedValue(
+      new BadRequestException('Sustento tributario inválido'),
+    );
+
+    await expect(service.emitirRetencion(createValidDto())).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(base.validarSustentoCatalogo).toHaveBeenCalledWith(
+      '01',
+      '01',
+      '2026-02-07',
+    );
+    expect(sriSoapClient.enviarYAutorizar).not.toHaveBeenCalled();
+  });
+
+  it('U-RET-20: parteRel llega al XML; sin él, NO', async () => {
+    autorizar();
+    const dto = createValidDto();
+    dto.sujetoRetenido.parteRel = 'SI';
+
+    await service.emitirRetencion(dto);
+    await service.emitirRetencion(createValidDto());
+
+    const [conSi, sinNada] = xmlBuilderService.buildRetencion.mock.calls.map(
+      ([r]) => r.infoCompRetencion.parteRel,
+    );
+    expect(conSi).toBe('SI');
+    expect(sinNada).toBe('NO');
+  });
+
+  it('U-RET-21: guarda codSustento, forma de pago e impuestos del documento', async () => {
+    autorizar();
+
+    await service.emitirRetencion(createValidDto());
+
+    const insert = mockClient.query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO comprobante_retenciones'),
+    )!;
+    expect(insert[0]).toContain(
+      'cod_sustento, forma_pago, impuestos_doc_sustento',
+    );
+    const params = insert[1] as unknown[];
+    expect(params.slice(-3)).toEqual([
+      '01',
+      '01', // sin formaPago en la petición: la misma que pone el XML
+      JSON.stringify(createValidDto().impuestos[0].impuestosDocSustento),
+    ]);
   });
 
   // ==========================================
