@@ -170,9 +170,11 @@ export class RetencionService {
         this.logger.warn('Emisor no encontrado en BD, retención no persistida');
       }
 
-      // Emit events for webhooks
+      // Eventos para webhooks. Sin `emisorId` el webhook no sabe de quién es el
+      // comprobante (`WebhooksService.emit`): la retención salía hacia todos.
       if (resultado.success) {
         this.eventEmitter.emit('comprobante.autorizado', {
+          emisorId: emisor?.id,
           claveAcceso,
           emisorRuc: dto.emisor.ruc,
           tipoComprobante: TipoComprobante.COMPROBANTE_RETENCION,
@@ -182,6 +184,7 @@ export class RetencionService {
         });
       } else {
         this.eventEmitter.emit('comprobante.rechazado', {
+          emisorId: emisor?.id,
           claveAcceso,
           emisorRuc: dto.emisor.ruc,
           tipoComprobante: TipoComprobante.COMPROBANTE_RETENCION,
@@ -342,6 +345,7 @@ export class RetencionService {
         `CRÍTICO: RET ${claveAcceso} autorizada por SRI pero NO persistida: ${(error as Error).message}`,
       );
       this.eventEmitter.emit('comprobante.persistencia_fallida', {
+        emisorId,
         claveAcceso,
         emisorRuc: dto.emisor.ruc,
         tipoComprobante: TipoComprobante.COMPROBANTE_RETENCION,

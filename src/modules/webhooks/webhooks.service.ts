@@ -297,23 +297,45 @@ export class WebhooksService {
   /**
    * Despacha webhooks a la cola BullMQ en vez de usar setTimeout.
    * BullMQ gestiona reintentos con backoff exponencial nativo.
+   *
+   * **A quién le llega un evento** (2026-09-30, fase R0 de retenciones):
+   *   - al webhook atado a ese emisor (`emisor_id`);
+   *   - al webhook sin emisor **del mismo tenant que el emisor**;
+   *   - al webhook global (sin emisor ni tenant), que solo crea un SUPERADMIN.
+   *
+   * 🔴 Antes bastaba con `emisor_id IS NULL`, sin mirar el tenant. Business
+   * registra cada webhook **sin emisor** —uno por negocio y uno de plataforma—,
+   * así que cada evento de cualquier negocio salía hacia el webhook de todos.
+   * Y un evento **sin `emisorId`** (la retención, la anulación, la persistencia
+   * fallida) ni siquiera filtraba: iba a todos los webhooks suscritos.
+   *
+   * Sin `emisorId` ya no se adivina: solo se entrega a los globales. Quien emita
+   * un evento de comprobante tiene que decir de qué emisor es.
    */
   async emit(
     evento: WebhookEvent,
     payload: Record<string, unknown>,
     emisorId?: string,
   ): Promise<void> {
-    // Buscar webhooks suscritos a este evento
     let query = `
       SELECT id, url, secreto, reintentos_max
       FROM webhook_configs
       WHERE activo = true AND $1 = ANY(eventos)
     `;
-    const params: (string | undefined)[] = [evento];
+    const params: string[] = [evento];
 
     if (emisorId) {
-      query += ` AND (emisor_id IS NULL OR emisor_id = $2)`;
+      query += ` AND (
+        emisor_id = $2
+        OR (emisor_id IS NULL AND tenant_id IS NULL)
+        OR (emisor_id IS NULL AND tenant_id = (SELECT tenant_id FROM emisores WHERE id = $2))
+      )`;
       params.push(emisorId);
+    } else {
+      this.logger.warn(
+        `Evento ${evento} sin emisorId (${typeof payload.claveAcceso === 'string' ? payload.claveAcceso : '?'}): solo se entrega a los webhooks globales`,
+      );
+      query += ` AND emisor_id IS NULL AND tenant_id IS NULL`;
     }
 
     const configs = await this.db.query(query, params);

@@ -330,6 +330,7 @@ export class NotaCreditoService {
         `CRÍTICO: NC ${claveAcceso} autorizada por SRI pero NO persistida: ${(error as Error).message}`,
       );
       this.eventEmitter.emit('comprobante.persistencia_fallida', {
+        emisorId,
         claveAcceso,
         emisorRuc: dto.emisor.ruc,
         tipoComprobante: TipoComprobante.NOTA_CREDITO,

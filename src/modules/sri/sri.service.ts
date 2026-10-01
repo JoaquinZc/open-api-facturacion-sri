@@ -547,8 +547,10 @@ export class SriService {
       `Comprobante ${claveAcceso} anulado. Estado anterior: ${estadoActual}`,
     );
 
-    // #6: Emitir evento de anulación para notificación
+    // #6: Emitir evento de anulación para notificación. Con su emisor: sin él
+    // el webhook no sabe a qué negocio pertenece (`WebhooksService.emit`).
     this.eventEmitter.emit('comprobante.anulado', {
+      emisorId: comprobante.emisor_id,
       claveAcceso,
       tipoComprobante: comprobante.tipo_comprobante,
       estadoAnterior: estadoActual,
@@ -1145,7 +1147,13 @@ export class SriService {
         { estado: 'ANULADO', estado_sri: 'ANULADO' },
       );
 
+      // La solicitud solo guarda el RUC; el webhook necesita el emisor.
+      const anulado = await this.repository.findComprobanteByClaveAcceso(
+        solicitud.comprobante_clave_acceso,
+      );
+
       this.eventEmitter.emit('comprobante.anulado', {
+        emisorId: anulado?.emisor_id,
         claveAcceso: solicitud.comprobante_clave_acceso,
         tipoComprobante: solicitud.tipo_comprobante,
         estadoAnterior: 'AUTORIZADO',

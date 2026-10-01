@@ -760,6 +760,26 @@ describe('SriService — Consultas', () => {
       });
     });
 
+    it('U-ANU-01b: comprobante.anulado sale con el emisor del comprobante', async () => {
+      // Sin emisorId el webhook no sabe de quién es y, antes de R0, salía
+      // hacia el webhook de todos los negocios.
+      repository.findComprobanteByClaveAcceso.mockResolvedValue({
+        id: 'comp-1',
+        emisor_id: 'emisor-uuid-7',
+        estado: 'PENDIENTE',
+      } as any);
+      repository.updateComprobante.mockResolvedValue(undefined as any);
+
+      await service.anularComprobante(
+        '0702202601092438363100110010010000000161245294013',
+      );
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'comprobante.anulado',
+        expect.objectContaining({ emisorId: 'emisor-uuid-7' }),
+      );
+    });
+
     it('U-ANU-02: anular DEVUELTA cambia estado a ANULADO', async () => {
       repository.findComprobanteByClaveAcceso.mockResolvedValue({
         id: 'comp-1',

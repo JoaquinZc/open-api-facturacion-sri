@@ -3,11 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { RealtimeService } from './realtime.service';
 import { UserRole } from '../auth/dto/auth.dto';
+import { DatabaseService } from '../../database/database.service';
 
 describe('RealtimeService', () => {
   let service: RealtimeService;
   let jwtService: { verify: jest.Mock };
   let configService: { get: jest.Mock };
+  let db: { queryOne: jest.Mock };
 
   beforeEach(async () => {
     jwtService = {
@@ -30,11 +32,21 @@ describe('RealtimeService', () => {
       }),
     };
 
+    // El tenant de cada emisor, como lo devolvería `emisores`.
+    db = {
+      queryOne: jest.fn((_sql: string, [emisorId]: string[]) =>
+        Promise.resolve(
+          { 'emisor-a': { tenant_id: 'tenant-1' } }[emisorId] ?? null,
+        ),
+      ),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         RealtimeService,
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
+        { provide: DatabaseService, useValue: db },
       ],
     }).compile();
 
@@ -205,6 +217,53 @@ describe('RealtimeService', () => {
           tenantId: 'tenant-1',
         }),
       ).not.toThrow();
+    });
+
+    /** Conecta y devuelve lo que va recibiendo esa conexión. */
+    const conectar = (
+      id: string,
+      rol: UserRole,
+      tenantId: string | null,
+    ): string[] => {
+      const recibidos: string[] = [];
+      service
+        .createConnection(id, {
+          sub: id,
+          email: `${id}@test.com`,
+          rol,
+          tenantId: tenantId as any,
+        })
+        .subscribe((e) => recibidos.push(String(e.data.claveAcceso)));
+      return recibidos;
+    };
+
+    // R0 de retenciones: ningún evento de comprobante trae `tenantId`, y sin él
+    // `broadcast` se lo mandaba a todas las conexiones.
+    it('sin tenantId, lo resuelve por el emisor: solo lo ve su tenant', async () => {
+      const suyo = conectar('c1', UserRole.USER, 'tenant-1');
+      const ajeno = conectar('c2', UserRole.USER, 'tenant-2');
+
+      await service.handleComprobanteAutorizado({
+        claveAcceso: 'CLAVE-A',
+        emisorId: 'emisor-a',
+      });
+
+      expect(suyo).toEqual(['CLAVE-A']);
+      expect(ajeno).toEqual([]);
+    });
+
+    it('sin tenant ni emisor conocido: solo lo ve el SUPERADMIN', async () => {
+      const usuario = conectar('c1', UserRole.USER, 'tenant-1');
+      const admin = conectar('adm', UserRole.SUPERADMIN, null);
+
+      await service.handleComprobanteAnulado({ claveAcceso: 'CLAVE-X' });
+      await service.handleComprobantePersistenciaFallida({
+        claveAcceso: 'CLAVE-Y',
+        emisorId: 'emisor-desconocido',
+      });
+
+      expect(usuario).toEqual([]);
+      expect(admin).toEqual(['CLAVE-X', 'CLAVE-Y']);
     });
 
     it('should send events to all tenants for SUPERADMIN', () => {

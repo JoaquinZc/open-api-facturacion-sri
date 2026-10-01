@@ -476,7 +476,10 @@ describe('WebhooksService', () => {
       expect(webhookQueue.add).not.toHaveBeenCalled();
     });
 
-    it('debe filtrar por emisorId cuando se proporciona', async () => {
+    /** El SQL sin espacios repetidos, para comparar condiciones. */
+    const sqlDe = (call: unknown[]) => String(call[0]).replace(/\s+/g, ' ');
+
+    it('con emisor: el webhook sin emisor solo recibe si es del tenant del emisor', async () => {
       db.query.mockResolvedValue({ rows: [] } as any);
 
       await service.emit(
@@ -485,9 +488,29 @@ describe('WebhooksService', () => {
         'emisor-uuid-1',
       );
 
-      const queryCall = db.query.mock.calls[0];
-      expect(queryCall[0]).toContain('emisor_id IS NULL OR emisor_id = $2');
-      expect(queryCall[1]).toContain('emisor-uuid-1');
+      const sql = sqlDe(db.query.mock.calls[0]);
+      expect(sql).toContain('emisor_id = $2');
+      expect(sql).toContain(
+        'emisor_id IS NULL AND tenant_id = (SELECT tenant_id FROM emisores WHERE id = $2)',
+      );
+      expect(sql).toContain('emisor_id IS NULL AND tenant_id IS NULL');
+      // El fallo: «emisor_id IS NULL» a secas abría el evento a todos los
+      // webhooks sin emisor, de cualquier tenant.
+      expect(sql).not.toMatch(/emisor_id IS NULL OR/);
+      expect(db.query.mock.calls[0][1]).toEqual([
+        'comprobante.autorizado',
+        'emisor-uuid-1',
+      ]);
+    });
+
+    it('sin emisor: solo los webhooks globales, nunca los de un tenant', async () => {
+      db.query.mockResolvedValue({ rows: [] } as any);
+
+      await service.emit('comprobante.anulado', { claveAcceso: '123' });
+
+      const sql = sqlDe(db.query.mock.calls[0]);
+      expect(sql).toContain('AND emisor_id IS NULL AND tenant_id IS NULL');
+      expect(db.query.mock.calls[0][1]).toEqual(['comprobante.anulado']);
     });
   });
 

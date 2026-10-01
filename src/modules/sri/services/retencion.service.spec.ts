@@ -454,10 +454,58 @@ describe('RetencionService — Emisión', () => {
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'comprobante.persistencia_fallida',
       expect.objectContaining({
+        emisorId: 'emisor-uuid-1',
         claveAcceso: expect.any(String),
         error: 'DB connection lost',
         tipoComprobante: '07',
       }),
+    );
+  });
+
+  // ==========================================
+  // U-RET-13b/c: los eventos llevan el emisor (fuga entre negocios, R0)
+  // ==========================================
+  // Sin `emisorId`, `WebhooksService.emit` no podía filtrar y la retención
+  // autorizada de un negocio llegaba al webhook de todos los demás.
+  it('U-RET-13b: comprobante.autorizado sale con el emisorId del emisor', async () => {
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
+    sriSoapClient.enviarYAutorizar.mockResolvedValue({
+      success: true,
+      claveAcceso: '0702202607092438363100110010010000000161245294017',
+      estado: 'AUTORIZADO',
+      numeroAutorizacion: '1234567890',
+      mensajes: [],
+    } as any);
+
+    await service.emitirRetencion(createValidDto());
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'comprobante.autorizado',
+      expect.objectContaining({
+        emisorId: 'emisor-uuid-1',
+        tipoComprobante: '07',
+      }),
+    );
+  });
+
+  it('U-RET-13c: comprobante.rechazado sale con el emisorId del emisor', async () => {
+    repository.executeInTransaction.mockImplementation(async (fn: any) =>
+      fn(mockClient),
+    );
+    sriSoapClient.enviarYAutorizar.mockResolvedValue({
+      success: false,
+      claveAcceso: '0702202607092438363100110010010000000161245294017',
+      estado: 'RECHAZADO',
+      mensajes: [{ identificador: '1', mensaje: 'x', tipo: 'ERROR' }],
+    } as any);
+
+    await service.emitirRetencion(createValidDto());
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'comprobante.rechazado',
+      expect.objectContaining({ emisorId: 'emisor-uuid-1' }),
     );
   });
 
