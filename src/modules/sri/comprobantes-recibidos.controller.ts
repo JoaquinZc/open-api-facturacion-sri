@@ -10,6 +10,7 @@ import {
 import {
   ComprobantesRecibidosService,
   type FacturaRecibida,
+  type RetencionRecibida,
 } from './services/comprobantes-recibidos.service';
 
 /**
@@ -35,18 +36,24 @@ export class ComprobantesRecibidosController {
   @ApiOperation({
     summary: 'Leer del SRI un comprobante recibido',
     description:
-      'Trae del servicio de autorización del SRI el XML autorizado de una clave de acceso de otro emisor y lo devuelve leído. No guarda nada. Hoy: facturas (01).',
+      'Trae del servicio de autorización del SRI el XML autorizado de una clave de acceso de otro emisor y lo devuelve leído. No guarda nada. Facturas (01) y comprobantes de retención (07).',
   })
   @ApiParam({ name: 'claveAcceso', description: '49 dígitos' })
-  @ApiResponse({ status: 200, description: 'La factura, leída' })
+  @ApiResponse({
+    status: 200,
+    description: 'El comprobante, leído (codDoc dice cuál)',
+  })
   @ApiResponse({ status: 400, description: 'Clave mal escrita' })
   @ApiResponse({ status: 404, description: 'El SRI no la tiene' })
   @ApiResponse({ status: 409, description: 'El SRI no la autorizó' })
-  @ApiResponse({ status: 422, description: 'No es una factura' })
+  @ApiResponse({
+    status: 422,
+    description: 'No es una factura ni una retención',
+  })
   @ApiResponse({ status: 503, description: 'El SRI no responde' })
   async consultar(
     @Param('claveAcceso') claveAcceso: string,
-  ): Promise<FacturaRecibida> {
+  ): Promise<FacturaRecibida | RetencionRecibida> {
     this.logger.log(`GET /sri/recibidos/...${claveAcceso.slice(-8)}`);
     return this.recibidos.consultar(claveAcceso);
   }
