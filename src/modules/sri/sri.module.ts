@@ -26,6 +26,8 @@ import { PdfModule } from '../pdf/pdf.module';
 import { TemplateModule } from '../template/template.module';
 import { SriEmisionProcessor } from './processors/sri-emision.processor';
 import { RideService } from './services/ride.service';
+import { ComprobantesRecibidosController } from './comprobantes-recibidos.controller';
+import { ComprobantesRecibidosService } from './services/comprobantes-recibidos.service';
 
 @Module({
   imports: [
@@ -35,8 +37,14 @@ import { RideService } from './services/ride.service';
     TemplateModule,
     BullModule.registerQueue({ name: 'sri-emision' }),
   ],
-  controllers: [SriController, CatalogosController],
+  controllers: [
+    SriController,
+    CatalogosController,
+    // Retenciones R2: leer del SRI lo que otro emitió. Solo lectura.
+    ComprobantesRecibidosController,
+  ],
   providers: [
+    ComprobantesRecibidosService,
     SriService,
     SriBaseService,
     FacturaService,
