@@ -28,6 +28,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import * as bcrypt from 'bcrypt';
 import { Client } from 'pg';
+import { MIGRACIONES_CATALOGO_RETENCIONES } from './catalogo-retenciones';
 
 /** Clave del advisory lock. Arbitraria pero estable: no debe cambiar nunca. */
 const ADVISORY_LOCK_KEY = 727164081;
@@ -195,6 +196,10 @@ async function seedAdmin(client: Client): Promise<void> {
  *     toca el catálogo): eso necesita una ventana y un respaldo.
  *   - Nunca una columna `NOT NULL` sin `DEFAULT`: bloquea el arranque contra
  *     una tabla con filas.
+ *   - **Datos de catálogo, sí, pero idempotentes** (desde R0 de retenciones,
+ *     2026-09-30): `INSERT … ON CONFLICT` y `UPDATE` acotados por la condición
+ *     que los vuelve inertes la segunda vez. Lo que estaba mal se desactiva,
+ *     no se borra. Ver `catalogo-retenciones.ts`.
  */
 const ADDITIVE_MIGRATIONS: Array<{ nombre: string; sql: string }> = [
   {
@@ -270,6 +275,9 @@ const ADDITIVE_MIGRATIONS: Array<{ nombre: string; sql: string }> = [
       $$
     `,
   },
+  // Catálogo de retenciones al día, sustento tributario y las columnas que
+  // guardan lo que el comprobante 07 no guardaba. Fase R0, 2026-09-30.
+  ...MIGRACIONES_CATALOGO_RETENCIONES,
 ];
 
 async function applyAdditiveMigrations(client: Client): Promise<void> {
