@@ -49,12 +49,21 @@ export class ImpuestoDocSustentoDto {
  * Impuesto retenido en el comprobante de retención
  */
 export class ImpuestoRetenidoDto {
-  @ApiProperty({ description: 'Código del impuesto (1=Renta, 2=IVA, 6=ISD)' })
+  @ApiProperty({
+    description:
+      'Código del impuesto retenido (ficha técnica, tabla 19): 1=Renta, 2=IVA, 6=ISD. Decide contra qué catálogo se valida codigoRetencion.',
+    enum: ['1', '2', '6'],
+  })
   @IsString()
-  @IsNotEmpty()
+  @IsIn(['1', '2', '6'], {
+    message: 'codigo debe ser 1 (renta), 2 (IVA) o 6 (ISD)',
+  })
   codigo: string;
 
-  @ApiProperty({ description: 'Código de retención según catálogo SRI' })
+  @ApiProperty({
+    description:
+      'Código de retención vigente a la fecha de emisión (GET /catalogos/retenciones). IVA: 9=10%, 10=20%, 1=30%, 11=50%, 2=70%, 3=100%, 7=retención en cero, 8=no procede.',
+  })
   @IsString()
   @IsNotEmpty()
   codigoRetencion: string;
@@ -66,12 +75,18 @@ export class ImpuestoRetenidoDto {
   @Min(0)
   baseImponible: number;
 
-  @ApiProperty({ description: 'Porcentaje de retención' })
+  @ApiProperty({
+    description:
+      'Porcentaje de retención. Debe ser el del catálogo vigente a la fecha de emisión.',
+  })
   @IsNumber()
   @Min(0)
   porcentajeRetener: number;
 
-  @ApiProperty({ description: 'Valor retenido' })
+  @ApiProperty({
+    description:
+      'Valor retenido = baseImponible × porcentajeRetener / 100, redondeado a 2 decimales (tolerancia 0,01).',
+  })
   @IsNumber()
   @Min(0)
   valorRetenido: number;
@@ -118,14 +133,18 @@ export class ImpuestoRetenidoDto {
   @IsIn(['01', '02'])
   pagoLocExt?: '01' | '02';
 
-  @ApiPropertyOptional({
+  /*
+   * Obligatorio desde R0 (Joaquín, 2026-09-30). Antes, si faltaba, se copiaba
+   * `codDocSustento`, que es otra tabla: una liquidación de compra (03) salía
+   * como «activo fijo» (03).
+   */
+  @ApiProperty({
     description:
-      'Código sustento tributario SRI (ej: 01=Crédito tributario IVA). Si se omite, se usa codDocSustento como fallback.',
+      'Sustento tributario (Tabla 5 del Catálogo ATS; GET /catalogos/sustentos): 01=Crédito tributario IVA, 02=Costo o gasto IR, 06=Inventario crédito IVA, 07=Inventario costo IR… Debe admitir codDocSustento.',
   })
-  @IsOptional()
   @IsString()
   @Matches(/^\d{2}$/, { message: 'codSustento debe tener 2 dígitos' })
-  codSustento?: string;
+  codSustento: string;
 
   @ApiPropertyOptional({
     description:
@@ -164,6 +183,16 @@ export class SujetoRetenidoDto {
   @IsString()
   @IsIn(['01', '02'])
   tipoSujetoRetenido?: '01' | '02';
+
+  @ApiPropertyOptional({
+    description:
+      'Parte relacionada con el agente de retención (<parteRel>). Por defecto NO.',
+    enum: ['SI', 'NO'],
+    default: 'NO',
+  })
+  @IsOptional()
+  @IsIn(['SI', 'NO'], { message: 'parteRel debe ser SI o NO' })
+  parteRel?: 'SI' | 'NO';
 
   @ApiProperty({ description: 'Número de identificación del sujeto retenido' })
   @IsString()

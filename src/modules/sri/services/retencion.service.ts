@@ -16,6 +16,10 @@ import {
   SriOperationResult,
 } from '../interfaces';
 import { TipoComprobante, Ambiente, TipoEmision } from '../constants';
+import { fechaSriAIso } from '../../../common/utils/fecha-ecuador';
+
+/** La que pone el XML si la petición no trae `formaPago` (sin sistema financiero). */
+const FORMA_PAGO_POR_DEFECTO = '01';
 
 @Injectable()
 export class RetencionService {
@@ -53,12 +57,26 @@ export class RetencionService {
         dto.sujetoRetenido.tipoIdentificacion,
       );
 
-      // Validar códigos de retención contra catálogo
-      await this.base.validarRetencionesCatalogo(dto.impuestos);
+      // Las retenciones, contra el catálogo **vigente el día de emisión**:
+      // código, porcentaje e importe. La tabla de renta cambió a mitad de
+      // 2026; validar contra la de hoy daría por buena una ya derogada.
+      const fechaEmisionIso = fechaSriAIso(dto.fechaEmision);
+      await this.base.validarRetencionesCatalogo(
+        dto.impuestos,
+        fechaEmisionIso,
+      );
 
-      // Validar documento sustento contra catálogo
+      // Documento sustento, su sustento tributario y la forma de pago
       for (const imp of dto.impuestos) {
         await this.base.validarDocumentoSustentoCatalogo(imp.codDocSustento);
+        await this.base.validarSustentoCatalogo(
+          imp.codSustento,
+          imp.codDocSustento,
+          fechaEmisionIso,
+        );
+        await this.base.validarFormasPagoCatalogo([
+          { formaPago: imp.formaPago ?? FORMA_PAGO_POR_DEFECTO },
+        ]);
       }
 
       const tipoEmision = dto.tipoEmision || TipoEmision.NORMAL;
@@ -250,11 +268,15 @@ export class RetencionService {
         if (retencion.impuestos && retencion.impuestos.length > 0) {
           for (const imp of retencion.impuestos) {
             await client.query(
-              `INSERT INTO comprobante_retenciones 
-               (comprobante_id, codigo, codigo_retencion, base_imponible, porcentaje_retener, valor_retenido, 
-                cod_doc_sustento, num_doc_sustento, fecha_emision_doc_sustento, 
-                total_sin_impuestos, importe_total, pago_loc_ext)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+              // cod_sustento, forma_pago e impuestos_doc_sustento desde R0: el
+              // XML los llevaba pero la base no, y R6 (resumen para el 103/104
+              // y el ATS) los necesita sin tener que releer cada XML.
+              `INSERT INTO comprobante_retenciones
+               (comprobante_id, codigo, codigo_retencion, base_imponible, porcentaje_retener, valor_retenido,
+                cod_doc_sustento, num_doc_sustento, fecha_emision_doc_sustento,
+                total_sin_impuestos, importe_total, pago_loc_ext,
+                cod_sustento, forma_pago, impuestos_doc_sustento)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
               [
                 comprobante.id,
                 imp.codigo,
@@ -268,6 +290,9 @@ export class RetencionService {
                 imp.totalSinImpuestos,
                 imp.importeTotal,
                 imp.pagoLocExt,
+                imp.codSustento,
+                imp.formaPago ?? FORMA_PAGO_POR_DEFECTO,
+                JSON.stringify(imp.impuestosDocSustento ?? []),
               ],
             );
           }
@@ -390,6 +415,7 @@ export class RetencionService {
       tipoIdentificacionSujetoRetenido: dto.sujetoRetenido
         .tipoIdentificacion as any,
       tipoSujetoRetenido: dto.sujetoRetenido.tipoSujetoRetenido,
+      parteRel: dto.sujetoRetenido.parteRel ?? 'NO',
       razonSocialSujetoRetenido: dto.sujetoRetenido.razonSocial,
       identificacionSujetoRetenido: dto.sujetoRetenido.identificacion,
       periodoFiscal: dto.periodoFiscal,

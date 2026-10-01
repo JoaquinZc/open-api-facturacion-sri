@@ -570,6 +570,23 @@ describe('XmlBuilderService', () => {
       expect(xml).toContain('<parteRel>NO</parteRel>');
     });
 
+    it('parteRel SI sale tal cual (R0)', () => {
+      const r = createRetencion();
+      r.infoCompRetencion.parteRel = 'SI';
+      expect(service.buildRetencion(r)).toContain('<parteRel>SI</parteRel>');
+    });
+
+    it('codSustento es el suyo, no el codDocSustento (R0)', () => {
+      // Una liquidación de compra (03) como costo o gasto (02): antes salía
+      // <codSustento>03</codSustento>, que es «activo fijo».
+      const r = createRetencion();
+      r.impuestos[0].codDocSustento = '03';
+      r.impuestos[0].codSustento = '02';
+      const xml = service.buildRetencion(r);
+      expect(xml).toContain('<codSustento>02</codSustento>');
+      expect(xml).toContain('<codDocSustento>03</codDocSustento>');
+    });
+
     it('debe incluir docsSustento con docSustento', () => {
       const xml = service.buildRetencion(createRetencion());
       expect(xml).toContain('<docsSustento>');

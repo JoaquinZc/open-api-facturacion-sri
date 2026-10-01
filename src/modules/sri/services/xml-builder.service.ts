@@ -461,7 +461,8 @@ export class XmlBuilderService {
       const key = `${imp.codDocSustento}-${imp.numDocSustento}`;
       if (!docsMap.has(key)) {
         docsMap.set(key, {
-          codSustento: imp.codSustento || imp.codDocSustento,
+          // Sin fallback a codDocSustento: son tablas distintas (R0).
+          codSustento: imp.codSustento,
           codDocSustento: imp.codDocSustento,
           numDocSustento: imp.numDocSustento,
           fechaEmisionDocSustento: imp.fechaEmisionDocSustento,
