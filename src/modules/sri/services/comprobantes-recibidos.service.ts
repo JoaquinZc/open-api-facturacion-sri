@@ -237,10 +237,13 @@ export class ComprobantesRecibidosService {
   ) {}
 
   /**
-   * Trae del SRI el comprobante autorizado de esa clave y lo devuelve leído.
-   * Hoy, solo facturas (R2); las retenciones recibidas llegan en R5.
+   * Trae del SRI el comprobante autorizado de esa clave y lo devuelve leído:
+   * una factura (01, R2) o un comprobante de retención (07, R5). `codDoc`
+   * dice cuál.
    */
-  async consultar(claveCruda: string): Promise<FacturaRecibida> {
+  async consultar(
+    claveCruda: string,
+  ): Promise<FacturaRecibida | RetencionRecibida> {
     const claveAcceso = (claveCruda ?? '').replace(/\s/g, '');
     if (!this.claves.validate(claveAcceso)) {
       throw new BadRequestException(
@@ -289,13 +292,7 @@ export class ComprobantesRecibidosService {
     }
 
     const codDoc = claveAcceso.substring(8, 10);
-    if (codDoc !== '01') {
-      throw new UnprocessableEntityException(
-        `Esa clave es de un comprobante ${codDoc}; aquí solo se registran facturas (01)`,
-      );
-    }
-
-    return leerFactura(raiz, {
+    const autorizacion = {
       claveAcceso,
       numeroAutorizacion: auth.numeroAutorizacion ?? claveAcceso,
       fechaAutorizacion:
@@ -305,6 +302,182 @@ export class ComprobantesRecibidosService {
             ? String(auth.fechaAutorizacion)
             : null,
       xml,
-    });
+    };
+
+    if (codDoc === '01') return leerFactura(raiz, autorizacion);
+    if (codDoc === '07') return leerRetencion(raiz, autorizacion);
+    throw new UnprocessableEntityException(
+      `Esa clave es de un comprobante ${codDoc}; aquí se leen facturas (01) y retenciones (07)`,
+    );
   }
+}
+
+// ─── R5 · Comprobante de retención recibido ──────────────────────────────────
+
+export interface RetencionRecibidaLinea {
+  /** 1 renta, 2 IVA, 6 ISD. */
+  codigo: string;
+  codigoRetencion: string;
+  baseImponible: number;
+  porcentajeRetener: number;
+  valorRetenido: number;
+}
+
+/** Un documento sustento: la factura a la que se le retuvo. */
+export interface RetencionRecibidaDocumento {
+  /** Solo en la 2.0.0. */
+  codSustento: string | null;
+  codDocSustento: string;
+  /** `eee-ppp-sssssssss`, aunque el XML lo traiga en 15 dígitos seguidos. */
+  numDocSustento: string;
+  /** `aaaa-mm-dd` */
+  fechaEmisionDocSustento: string | null;
+  retenciones: RetencionRecibidaLinea[];
+}
+
+export interface RetencionRecibida {
+  claveAcceso: string;
+  numeroAutorizacion: string;
+  fechaAutorizacion: string | null;
+  ambiente: '1' | '2';
+  codDoc: '07';
+  /** `1.0.0` o `2.0.0`: la forma de las líneas cambia entre las dos. */
+  version: string;
+  /** Quien retuvo: el cliente que es agente de retención. */
+  agente: { ruc: string; razonSocial: string };
+  numero: string;
+  fechaEmision: string;
+  /** `mm/aaaa` */
+  periodoFiscal: string;
+  /** A quien se le retuvo: tiene que ser quien pregunta. */
+  sujeto: {
+    tipoIdentificacion: string;
+    identificacion: string;
+    razonSocial: string;
+  };
+  documentos: RetencionRecibidaDocumento[];
+  xml: string;
+}
+
+/** `001001000000123` o `001-001-000000123` → `001-001-000000123`. */
+export function numeroConGuiones(numero: string): string {
+  const d = numero.replace(/\D/g, '');
+  if (d.length !== 15) {
+    throw new UnprocessableEntityException(
+      `El número del documento sustento no tiene 15 dígitos: ${numero}`,
+    );
+  }
+  return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
+function lineaRetenida(n: Nodo): RetencionRecibidaLinea {
+  return {
+    codigo: obligatorio(n, 'codigo'),
+    codigoRetencion: obligatorio(n, 'codigoRetencion'),
+    baseImponible: numero(n, 'baseImponible'),
+    porcentajeRetener: numero(n, 'porcentajeRetener'),
+    valorRetenido: numero(n, 'valorRetenido'),
+  };
+}
+
+/**
+ * Lee un comprobante de retención (07) ya parseado por xml2js. Las dos
+ * versiones del SRI:
+ * - **2.0.0**: un `docSustento` por factura, cada uno con sus `retenciones`;
+ * - **1.0.0**: una lista plana de `impuestos`, cada uno con su documento
+ *   sustento. Se agrupan por documento para devolver la misma forma.
+ */
+export function leerRetencion(
+  raiz: Nodo,
+  autorizacion: {
+    claveAcceso: string;
+    numeroAutorizacion: string;
+    fechaAutorizacion: string | null;
+    xml: string;
+  },
+): RetencionRecibida {
+  const comprobante = raiz.comprobanteRetencion as Nodo | undefined;
+  if (!comprobante) {
+    throw new UnprocessableEntityException(
+      'El comprobante autorizado no es una retención',
+    );
+  }
+  const atributos = (comprobante.$ ?? {}) as Nodo;
+  const version =
+    typeof atributos.version === 'string' ? atributos.version : '1.0.0';
+  const tributaria = comprobante.infoTributaria as Nodo | undefined;
+  const info = comprobante.infoCompRetencion as Nodo | undefined;
+
+  let documentos: RetencionRecibidaDocumento[];
+  if (version.startsWith('2')) {
+    const docs = comoLista(
+      (comprobante.docsSustento as Nodo | undefined)?.docSustento as
+        | Nodo
+        | Nodo[]
+        | undefined,
+    );
+    documentos = docs.map((d) => {
+      const fecha = texto(d, 'fechaEmisionDocSustento');
+      return {
+        codSustento: texto(d, 'codSustento'),
+        codDocSustento: obligatorio(d, 'codDocSustento'),
+        numDocSustento: numeroConGuiones(obligatorio(d, 'numDocSustento')),
+        fechaEmisionDocSustento: fecha ? fechaSriADia(fecha) : null,
+        retenciones: comoLista(
+          (d.retenciones as Nodo | undefined)?.retencion as
+            | Nodo
+            | Nodo[]
+            | undefined,
+        ).map(lineaRetenida),
+      };
+    });
+  } else {
+    const porDocumento = new Map<string, RetencionRecibidaDocumento>();
+    for (const imp of comoLista(
+      (comprobante.impuestos as Nodo | undefined)?.impuesto as
+        | Nodo
+        | Nodo[]
+        | undefined,
+    )) {
+      const numero = numeroConGuiones(obligatorio(imp, 'numDocSustento'));
+      const fecha = texto(imp, 'fechaEmisionDocSustento');
+      const doc = porDocumento.get(numero) ?? {
+        codSustento: null,
+        codDocSustento: obligatorio(imp, 'codDocSustento'),
+        numDocSustento: numero,
+        fechaEmisionDocSustento: fecha ? fechaSriADia(fecha) : null,
+        retenciones: [],
+      };
+      doc.retenciones.push(lineaRetenida(imp));
+      porDocumento.set(numero, doc);
+    }
+    documentos = [...porDocumento.values()];
+  }
+
+  return {
+    claveAcceso: autorizacion.claveAcceso,
+    numeroAutorizacion: autorizacion.numeroAutorizacion,
+    fechaAutorizacion: autorizacion.fechaAutorizacion,
+    ambiente: obligatorio(tributaria, 'ambiente') === '2' ? '2' : '1',
+    codDoc: '07',
+    version,
+    agente: {
+      ruc: obligatorio(tributaria, 'ruc'),
+      razonSocial: obligatorio(tributaria, 'razonSocial'),
+    },
+    numero: [
+      obligatorio(tributaria, 'estab'),
+      obligatorio(tributaria, 'ptoEmi'),
+      obligatorio(tributaria, 'secuencial'),
+    ].join('-'),
+    fechaEmision: fechaSriADia(obligatorio(info, 'fechaEmision')),
+    periodoFiscal: obligatorio(info, 'periodoFiscal'),
+    sujeto: {
+      tipoIdentificacion: obligatorio(info, 'tipoIdentificacionSujetoRetenido'),
+      identificacion: obligatorio(info, 'identificacionSujetoRetenido'),
+      razonSocial: obligatorio(info, 'razonSocialSujetoRetenido'),
+    },
+    documentos,
+    xml: autorizacion.xml,
+  };
 }
