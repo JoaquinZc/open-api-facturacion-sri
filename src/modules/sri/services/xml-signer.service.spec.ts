@@ -344,6 +344,50 @@ describe('XmlSignerService', () => {
       ).rejects.toThrow('no tiene certificado configurado');
     });
 
+    it('debe usar el P12 de la base sin tocar el disco', async () => {
+      db.queryOne.mockResolvedValue({
+        ...mockEmisor,
+        certificado_p12: Buffer.from('p12-en-la-base'),
+      } as any);
+      const fs = require('fs');
+      fs.existsSync.mockClear().mockReturnValue(false);
+      fs.readFileSync.mockClear();
+
+      const result = await service.loadEmisorCertificate('0924383631001');
+
+      expect(result.privateKey).toBeDefined();
+      expect(fs.existsSync).not.toHaveBeenCalled();
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+      expect(db.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('certificado_p12'),
+        ['0924383631001'],
+      );
+    });
+
+    it('debe cargar el P12 de la base aunque falte certificado_nombre', async () => {
+      db.queryOne.mockResolvedValue({
+        certificado_nombre: null,
+        certificado_password_encrypted: 'encrypted',
+        certificado_p12: Buffer.from('p12-en-la-base'),
+      } as any);
+
+      const result = await service.loadEmisorCertificate('0924383631001');
+      expect(result.certificate).toBeDefined();
+    });
+
+    it('debe caer al disco cuando la base no tiene el binario', async () => {
+      db.queryOne.mockResolvedValue({
+        ...mockEmisor,
+        certificado_p12: null,
+      } as any);
+      const fs = require('fs');
+      fs.existsSync.mockReturnValue(true);
+      fs.readFileSync.mockClear().mockReturnValue(Buffer.from('fake-p12'));
+
+      await service.loadEmisorCertificate('0924383631001');
+      expect(fs.readFileSync).toHaveBeenCalled();
+    });
+
     it('debe lanzar error cuando el archivo del certificado no existe en filesystem', async () => {
       db.queryOne.mockResolvedValue(mockEmisor as any);
       const fs = require('fs');
