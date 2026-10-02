@@ -9,6 +9,12 @@ export class SriSoapFactoryService {
   // Cache de clientes en memoria. Clave: tipo_ambiente (ej: 'recepcion_1')
   private clients = new Map<string, Client>();
 
+  /**
+   * Para bajar el WSDL. Es lo primero que hace un proceso recién desplegado, y
+   * sin límite un SRI lento lo dejaba colgado sin fin (2026-10-02).
+   */
+  private static readonly WSDL_TIMEOUT_MS = 15_000;
+
   private readonly WSDL_URLS = {
     recepcion: {
       '1': 'https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl', // Pruebas
@@ -39,7 +45,9 @@ export class SriSoapFactoryService {
     this.logger.log(
       `Creando nuevo cliente SOAP de Recepción para ambiente ${ambiente}`,
     );
-    const client = await soap.createClientAsync(wsdlUrl);
+    const client = await soap.createClientAsync(wsdlUrl, {
+      wsdl_options: { timeout: SriSoapFactoryService.WSDL_TIMEOUT_MS },
+    });
 
     this.clients.set(cacheKey, client);
     return client;
@@ -64,7 +72,9 @@ export class SriSoapFactoryService {
     this.logger.log(
       `Creando nuevo cliente SOAP de Autorización para ambiente ${ambiente}`,
     );
-    const client = await soap.createClientAsync(wsdlUrl);
+    const client = await soap.createClientAsync(wsdlUrl, {
+      wsdl_options: { timeout: SriSoapFactoryService.WSDL_TIMEOUT_MS },
+    });
 
     this.clients.set(cacheKey, client);
     return client;

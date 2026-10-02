@@ -76,9 +76,11 @@ describe('SriSoapClient', () => {
       const result = await service.validarComprobante('<factura/>', '1');
 
       expect(result.estado).toBe('RECIBIDA');
-      expect(mockRecepcionClient.validarComprobanteAsync).toHaveBeenCalledWith({
-        xml: expect.any(String),
-      });
+      // Con tiempo de espera: sin él, una recepción colgada no terminaba nunca.
+      expect(mockRecepcionClient.validarComprobanteAsync).toHaveBeenCalledWith(
+        { xml: expect.any(String) },
+        { timeout: 10_000 },
+      );
       const callArg =
         mockRecepcionClient.validarComprobanteAsync.mock.calls[0][0];
       expect(Buffer.from(callArg.xml, 'base64').toString('utf-8')).toBe(
@@ -396,6 +398,91 @@ describe('SriSoapClient', () => {
       expect(result.success).toBe(false);
       expect(result.estado).toBe('NO AUTORIZADO');
       expect(result.mensajes).toHaveLength(1);
+    });
+
+    it('«CLAVE ACCESO REGISTRADA» (43) no es devolución: sigue a la autorización', async () => {
+      // El primer intento se cortó por tiempo pero llegó; el reenvío dice 43.
+      mockRecepcionClient.validarComprobanteAsync
+        .mockRejectedValueOnce(new Error('timeout of 10000ms exceeded'))
+        .mockResolvedValueOnce([
+          {
+            RespuestaRecepcionComprobante: {
+              estado: 'DEVUELTA',
+              comprobantes: {
+                comprobante: {
+                  claveAcceso: CLAVE_ACCESO,
+                  mensajes: {
+                    mensaje: {
+                      identificador: '43',
+                      mensaje: 'CLAVE ACCESO REGISTRADA',
+                      tipo: 'ERROR',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ]);
+      mockAutorizacionClient.autorizacionComprobanteAsync.mockResolvedValue([
+        {
+          RespuestaAutorizacionComprobante: {
+            numeroComprobantes: '1',
+            autorizaciones: {
+              autorizacion: {
+                estado: 'AUTORIZADO',
+                numeroAutorizacion: CLAVE_ACCESO,
+                fechaAutorizacion: '2026-10-02T12:02:49-05:00',
+                ambiente: '1',
+              },
+            },
+          },
+        },
+      ]);
+
+      const result = await service.enviarYAutorizar('<factura/>', CLAVE_ACCESO);
+
+      expect(result.success).toBe(true);
+      expect(result.estado).toBe('AUTORIZADO');
+    });
+
+    it('un error de red al consultar la autorización no tumba la emisión: EN PROCESO con la clave', async () => {
+      // Ya RECIBIDA: lanzar haría que Business reemitiera con otro secuencial.
+      mockRecepcionClient.validarComprobanteAsync.mockResolvedValue([
+        { RespuestaRecepcionComprobante: { estado: 'RECIBIDA' } },
+      ]);
+      mockAutorizacionClient.autorizacionComprobanteAsync.mockRejectedValue(
+        new Error('read ECONNRESET'),
+      );
+
+      const result = await service.enviarYAutorizar('<factura/>', CLAVE_ACCESO);
+
+      expect(result.estado).toBe('EN PROCESO');
+      expect(result.claveAcceso).toBe(CLAVE_ACCESO);
+      expect(
+        mockAutorizacionClient.autorizacionComprobanteAsync,
+      ).toHaveBeenCalledTimes(5);
+    });
+
+    it('tras un error de red, el siguiente intento de autorización sí cuenta', async () => {
+      mockRecepcionClient.validarComprobanteAsync.mockResolvedValue([
+        { RespuestaRecepcionComprobante: { estado: 'RECIBIDA' } },
+      ]);
+      mockAutorizacionClient.autorizacionComprobanteAsync
+        .mockRejectedValueOnce(new Error('read ECONNRESET'))
+        .mockResolvedValueOnce([
+          {
+            RespuestaAutorizacionComprobante: {
+              numeroComprobantes: '1',
+              autorizaciones: {
+                autorizacion: { estado: 'AUTORIZADO', ambiente: '1' },
+              },
+            },
+          },
+        ]);
+
+      const result = await service.enviarYAutorizar('<factura/>', CLAVE_ACCESO);
+
+      expect(result.estado).toBe('AUTORIZADO');
     });
 
     it('debe retornar EN PROCESO cuando se agotan reintentos de autorizacion', async () => {
