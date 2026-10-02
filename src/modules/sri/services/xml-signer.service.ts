@@ -15,6 +15,7 @@ import { STORAGE_PATHS } from '../../../common/utils/storage-paths';
 interface EmisorCertificado {
   certificado_nombre: string;
   certificado_password_encrypted: string;
+  certificado_p12: Buffer | null;
 }
 
 /**
@@ -304,15 +305,15 @@ export class XmlSignerService implements OnModuleInit {
 
     // Get certificate info from database
     const emisor = await this.db.queryOne<EmisorCertificado>(
-      `SELECT certificado_nombre, certificado_password_encrypted 
-       FROM emisores 
+      `SELECT certificado_nombre, certificado_password_encrypted, certificado_p12
+       FROM emisores
        WHERE ruc = $1 AND estado = 'ACTIVO'`,
       [ruc],
     );
 
     if (
       !emisor ||
-      !emisor.certificado_nombre ||
+      (!emisor.certificado_p12 && !emisor.certificado_nombre) ||
       !emisor.certificado_password_encrypted
     ) {
       throw new Error(
@@ -325,15 +326,24 @@ export class XmlSignerService implements OnModuleInit {
       emisor.certificado_password_encrypted,
     );
 
-    // Load certificate from filesystem
-    const certPath = join(this.getCertsDir(), emisor.certificado_nombre);
-    if (!existsSync(certPath)) {
-      throw new Error(
-        `El archivo de certificado ${emisor.certificado_nombre} no existe en el servidor.`,
-      );
+    // El P12 se lee de la base, que es donde `upload-cert` guarda el binario.
+    // El disco del contenedor no sirve de fuente: el servicio no tiene volumen
+    // y cada despliegue borra `CERTS_DIR` — firmar desde ahí fallaba con «no
+    // existe en el servidor» tras cada push. El disco queda solo para filas
+    // viejas que tengan el nombre pero no el binario.
+    let p12Buffer: Buffer;
+    if (emisor.certificado_p12 && emisor.certificado_p12.length > 0) {
+      p12Buffer = emisor.certificado_p12;
+    } else {
+      const certPath = join(this.getCertsDir(), emisor.certificado_nombre);
+      if (!existsSync(certPath)) {
+        throw new Error(
+          `El archivo de certificado ${emisor.certificado_nombre} no existe en el servidor. ` +
+            'Vuelva a subir el certificado P12 del emisor.',
+        );
+      }
+      p12Buffer = readFileSync(certPath);
     }
-
-    const p12Buffer = readFileSync(certPath);
 
     // Process P12 certificate
     const p12Der = forge.util.createBuffer(p12Buffer.toString('binary'));
