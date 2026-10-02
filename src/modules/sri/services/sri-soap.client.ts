@@ -33,9 +33,17 @@ export class SriSoapClient {
 
     try {
       const client = await this.soapFactory.getRecepcionClient(ambiente);
-      const [result] = await client.validarComprobanteAsync({
-        xml: xmlBase64,
-      });
+      // `soap` pasa estas opciones a axios: sin `timeout`, una recepción
+      // colgada no terminaba nunca (2026-10-02).
+      const [result] = await client.validarComprobanteAsync(
+        { xml: xmlBase64 },
+        {
+          timeout: this.configService.get<number>(
+            'sri.rateLimiting.recepcion.timeoutMs',
+            10_000,
+          ),
+        },
+      );
 
       const response = result?.RespuestaRecepcionComprobante || result;
       this.logger.log(`Respuesta del SRI - Estado: ${response?.estado}`);
@@ -63,9 +71,15 @@ export class SriSoapClient {
     try {
       const ambiente = claveAcceso.charAt(23) as '1' | '2';
       const client = await this.soapFactory.getAutorizacionClient(ambiente);
-      const [result] = await client.autorizacionComprobanteAsync({
-        claveAccesoComprobante: claveAcceso,
-      });
+      const [result] = await client.autorizacionComprobanteAsync(
+        { claveAccesoComprobante: claveAcceso },
+        {
+          timeout: this.configService.get<number>(
+            'sri.rateLimiting.autorizacion.timeoutMs',
+            10_000,
+          ),
+        },
+      );
 
       const response = result?.RespuestaAutorizacionComprobante || result;
       this.logger.log(
@@ -143,6 +157,25 @@ export class SriSoapClient {
       throw ultimoError;
     }
 
+    /*
+     * 🔴 **«CLAVE ACCESO REGISTRADA» (43) no es una devolución: es que ya la
+     * tiene.** Pasa cuando un intento anterior de recepción se cortó por
+     * tiempo pero sí llegó. Darla por devuelta hacía que Business reemitiera
+     * con otro secuencial y el SRI acabara con dos facturas por la misma venta.
+     * Se sigue a la autorización, que dirá en qué estado está.
+     */
+    if (
+      recepcion?.estado === 'DEVUELTA' &&
+      this.extractMensajes(recepcion).some(
+        (m) => String(m.identificador) === '43',
+      )
+    ) {
+      this.logger.warn(
+        `El SRI ya tenía ...${claveAcceso.slice(-8)} (43): se consulta su autorización`,
+      );
+      recepcion = { ...recepcion, estado: 'RECIBIDA' };
+    }
+
     if (!recepcion || recepcion.estado === 'DEVUELTA') {
       const mensajes = recepcion ? this.extractMensajes(recepcion) : [];
       if (mensajes.length > 0) {
@@ -172,7 +205,24 @@ export class SriSoapClient {
         );
       }
 
-      const autorizacion = await this.autorizarComprobante(claveAcceso);
+      /*
+       * 🔴 **Un fallo de red aquí no puede tumbar la emisión.** El SRI ya
+       * RECIBIÓ el comprobante: si se lanza, Business no se entera de la clave y
+       * reemite con otro secuencial, y las dos acaban autorizadas. Se sigue
+       * intentando y, si no hay respuesta, se devuelve EN PROCESO con la clave;
+       * Business la guarda y su conciliador pregunta más tarde.
+       */
+      let autorizacion: SriAutorizacionResponse;
+      try {
+        autorizacion = await this.autorizarComprobante(claveAcceso);
+      } catch (error: unknown) {
+        this.logger.warn(
+          `Intento ${intento}/${autorizacionRetries} de autorización fallido por error de red: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        continue;
+      }
 
       if (
         autorizacion.autorizaciones &&

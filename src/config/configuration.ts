@@ -55,8 +55,10 @@ export default () => ({
       recepcion: {
         retries: parseInt(optionalEnv('SRI_RECEPCION_RETRIES', '3'), 10),
         delayMs: parseInt(optionalEnv('SRI_RECEPCION_DELAY_MS', '1000'), 10),
+        // Por llamada. Sin él, una recepción colgada no termina nunca y
+        // Business, que corta antes, reemite con otro secuencial.
         timeoutMs: parseInt(
-          optionalEnv('SRI_RECEPCION_TIMEOUT_MS', '30000'),
+          optionalEnv('SRI_RECEPCION_TIMEOUT_MS', '10000'),
           10,
         ),
       },
@@ -67,7 +69,7 @@ export default () => ({
           optionalEnv('SRI_AUTORIZACION_BACKOFF_MULTIPLIER', '1.5'),
         ),
         timeoutMs: parseInt(
-          optionalEnv('SRI_AUTORIZACION_TIMEOUT_MS', '60000'),
+          optionalEnv('SRI_AUTORIZACION_TIMEOUT_MS', '10000'),
           10,
         ),
       },
